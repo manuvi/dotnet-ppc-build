@@ -1,0 +1,75 @@
+From 35ff87b5e17f4184663fdfafbfb96860470cee17 Mon Sep 17 00:00:00 2001
+From: Manuel Virgilio <real_virgil@yahoo.it>
+Date: Thu, 12 Dec 2024 21:38:06 +0100
+Subject: [PATCH 2/5] cmake coreclt refactor for ppc64 little endian libunwind
+ cmake refactor for ppc64 little endian
+
+---
+ src/coreclr/jit/CMakeLists.txt      | 2 +-
+ src/coreclr/pal/src/CMakeLists.txt  | 6 +++---
+ src/native/external/libunwind.cmake | 4 ++--
+ 3 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/src/coreclr/jit/CMakeLists.txt b/src/coreclr/jit/CMakeLists.txt
+index 68155021d8e..ddbe3c215b0 100644
+--- a/src/coreclr/jit/CMakeLists.txt
++++ b/src/coreclr/jit/CMakeLists.txt
+@@ -496,7 +496,7 @@ elseif(CLR_CMAKE_TARGET_ARCH_ARM64)
+ elseif(CLR_CMAKE_TARGET_ARCH_S390X)
+   set(JIT_ARCH_SOURCES ${JIT_S390X_SOURCES})
+   set(JIT_ARCH_HEADERS ${JIT_S390X_HEADERS})
+-elseif(CLR_CMAKE_TARGET_ARCH_POWERPC64)
++elseif(CLR_CMAKE_TARGET_ARCH_POWERPC64LE)
+   set(JIT_ARCH_SOURCES ${JIT_POWERPC64_SOURCES})
+   set(JIT_ARCH_HEADERS ${JIT_POWERPC64_HEADERS})
+ elseif(CLR_CMAKE_TARGET_ARCH_LOONGARCH64)
+diff --git a/src/coreclr/pal/src/CMakeLists.txt b/src/coreclr/pal/src/CMakeLists.txt
+index cc301eb2757..9f3425c4adb 100644
+--- a/src/coreclr/pal/src/CMakeLists.txt
++++ b/src/coreclr/pal/src/CMakeLists.txt
+@@ -57,7 +57,7 @@ elseif(CLR_CMAKE_HOST_ARCH_I386)
+   set(PAL_ARCH_SOURCES_DIR i386)
+ elseif(CLR_CMAKE_HOST_ARCH_S390X)
+   set(PAL_ARCH_SOURCES_DIR s390x)
+-elseif(CLR_CMAKE_HOST_ARCH_POWERPC64)
++elseif(CLR_CMAKE_HOST_ARCH_POWERPC64LE)
+   set(PAL_ARCH_SOURCES_DIR ppc64le)
+ endif()
+ 
+@@ -309,9 +309,9 @@ if(CLR_CMAKE_TARGET_LINUX)
+   endif(CLR_CMAKE_USE_SYSTEM_LIBUNWIND)
+ 
+   # bundled libunwind requires using libucontext on alpine and x86 and ppc64le
+-  if(CLR_CMAKE_TARGET_LINUX_MUSL AND (CLR_CMAKE_TARGET_ARCH_I386 OR CLR_CMAKE_TARGET_ARCH_POWERPC64))
++  if(CLR_CMAKE_TARGET_LINUX_MUSL AND (CLR_CMAKE_TARGET_ARCH_I386 OR CLR_CMAKE_TARGET_ARCH_POWERPC64LE))
+     target_link_libraries(coreclrpal PUBLIC ucontext)
+-  endif(CLR_CMAKE_TARGET_LINUX_MUSL AND (CLR_CMAKE_TARGET_ARCH_I386 OR CLR_CMAKE_TARGET_ARCH_POWERPC64))
++  endif(CLR_CMAKE_TARGET_LINUX_MUSL AND (CLR_CMAKE_TARGET_ARCH_I386 OR CLR_CMAKE_TARGET_ARCH_POWERPC64LE))
+ 
+ endif(CLR_CMAKE_TARGET_LINUX)
+ 
+diff --git a/src/native/external/libunwind.cmake b/src/native/external/libunwind.cmake
+index 5dcca157e23..3f5ff2b9025 100644
+--- a/src/native/external/libunwind.cmake
++++ b/src/native/external/libunwind.cmake
+@@ -431,7 +431,7 @@ if(CLR_CMAKE_HOST_UNIX)
+         set(libunwind_la_SOURCES                    ${libunwind_la_SOURCES_s390x})
+         set(libunwind_remote_la_SOURCES             ${libunwind_s390x_la_SOURCES_s390x})
+         set(libunwind_elf_la_SOURCES                ${libunwind_elf64_la_SOURCES})
+-    elseif(CLR_CMAKE_HOST_ARCH_POWERPC64)
++    elseif(CLR_CMAKE_HOST_ARCH_POWERPC64LE)
+         set(libunwind_la_SOURCES                    ${libunwind_la_SOURCES_ppc64le})
+         set(libunwind_remote_la_SOURCES             ${libunwind_ppc64le_la_SOURCES_ppc64le})
+         set(libunwind_elf_la_SOURCES                ${libunwind_elf64_la_SOURCES})
+@@ -495,7 +495,7 @@ else(CLR_CMAKE_HOST_UNIX)
+         set(libunwind_la_SOURCES                    ${libunwind_la_SOURCES_s390x})
+         set(libunwind_remote_la_SOURCES             ${libunwind_s390x_la_SOURCES_s390x})
+         set(libunwind_elf_la_SOURCES                ${libunwind_elf64_la_SOURCES})
+-    elseif(CLR_CMAKE_TARGET_ARCH_POWERPC64)
++    elseif(CLR_CMAKE_TARGET_ARCH_POWERPC64LE)
+         set(libunwind_la_SOURCES                    ${libunwind_la_SOURCES_ppc64le})
+         set(libunwind_remote_la_SOURCES             ${libunwind_ppc64le_la_SOURCES_ppc64le})
+         set(libunwind_elf_la_SOURCES                ${libunwind_elf64_la_SOURCES})
+-- 
+2.45.2
+

@@ -1,0 +1,140 @@
+From 43c7b0fe3132405ef233c83740b98df165e6c45b Mon Sep 17 00:00:00 2001
+From: Manuel Virgilio <real_virgil@yahoo.it>
+Date: Thu, 19 Dec 2024 23:02:01 +0100
+Subject: [PATCH 2/2] fix ppc64
+
+---
+ Directory.Build.props                                        | 1 +
+ .../Microsoft.NET.Build.Containers/Registry/Registry.cs      | 1 +
+ .../redist-installer/projects/DownloadPackage.csproj         | 5 +++++
+ src/Installer/redist-installer/targets/Crossgen.targets      | 4 ++--
+ .../redist-installer/targets/GenerateBundledVersions.targets | 3 +++
+ .../Microsoft.DotNet.SourceBuild.SmokeTests/DotNetHelper.cs  | 2 +-
+ .../OmniSharpTests.cs                                        | 2 +-
+ test/dotnet.Tests/EnvironmentVariableNamesTests.cs           | 1 +
+ 8 files changed, 15 insertions(+), 4 deletions(-)
+
+diff --git a/Directory.Build.props b/Directory.Build.props
+index 90b657484e..770e181c04 100644
+--- a/Directory.Build.props
++++ b/Directory.Build.props
+@@ -6,6 +6,7 @@
+     <BuildArchitecture Condition="'$(BuildArchitecture)' == ''">$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant())</BuildArchitecture>
+     <Architecture Condition="'$(Architecture)' == '' AND ('$(BuildArchitecture)' == 'arm64')">$(BuildArchitecture)</Architecture>
+     <Architecture Condition="'$(Architecture)' == '' AND '$(BuildArchitecture)' == 's390x'">$(BuildArchitecture)</Architecture>
++    <Architecture Condition="'$(Architecture)' == '' AND '$(BuildArchitecture)' == 'ppc64'">$(BuildArchitecture)</Architecture>
+     <Architecture Condition="'$(Architecture)' == '' AND '$(BuildArchitecture)' == 'ppc64le'">$(BuildArchitecture)</Architecture>
+     <Architecture Condition="'$(Architecture)' == '' AND '$(BuildArchitecture)' == 'loongarch64'">$(BuildArchitecture)</Architecture>
+     <Architecture Condition="'$(Architecture)' == ''">x64</Architecture>
+diff --git a/src/Containers/Microsoft.NET.Build.Containers/Registry/Registry.cs b/src/Containers/Microsoft.NET.Build.Containers/Registry/Registry.cs
+index 20093b764c..e8d7ccc466 100644
+--- a/src/Containers/Microsoft.NET.Build.Containers/Registry/Registry.cs
++++ b/src/Containers/Microsoft.NET.Build.Containers/Registry/Registry.cs
+@@ -280,6 +280,7 @@ private static IReadOnlyDictionary<string, PlatformSpecificManifest> GetManifest
+             "x386" => "x86",
+             "arm" => $"arm{(platform.variant != "v7" ? platform.variant : "")}",
+             "arm64" => "arm64",
++            "ppc64" => "ppc64",
+             "ppc64le" => "ppc64le",
+             "s390x" => "s390x",
+             "riscv64" => "riscv64",
+diff --git a/src/Installer/redist-installer/projects/DownloadPackage.csproj b/src/Installer/redist-installer/projects/DownloadPackage.csproj
+index 76298af0fb..da2889cfeb 100644
+--- a/src/Installer/redist-installer/projects/DownloadPackage.csproj
++++ b/src/Installer/redist-installer/projects/DownloadPackage.csproj
+@@ -12,6 +12,11 @@
+     <ResolveAssemblyReferencesSilent>true</ResolveAssemblyReferencesSilent>
+   </PropertyGroup>
+ 
++  <Target Name="DebugVariables" BeforeTargets="Restore">
++    <Message Text="DEBUG!!!! PackageToRestore: $(PackageToRestore)" Importance="High" />
++    <Message Text="DEBUG!!!! PackageVersionToRestore: $(PackageVersionToRestore)" Importance="High" />
++  </Target>
++
+   <ItemGroup>
+     <!-- Use PackageDownload since we don't need to reference the package. -->
+     <!-- See: https://learn.microsoft.com/en-us/nuget/consume-packages/packagedownload-functionality -->
+diff --git a/src/Installer/redist-installer/targets/Crossgen.targets b/src/Installer/redist-installer/targets/Crossgen.targets
+index 85e90c74eb..e6f02804f0 100644
+--- a/src/Installer/redist-installer/targets/Crossgen.targets
++++ b/src/Installer/redist-installer/targets/Crossgen.targets
+@@ -1,8 +1,8 @@
+ <Project>
+ 
+-  <!-- Crossgen is currently not supported on the s390x, ppc64le architecture as using mono instead of CoreCLR. -->
++  <!-- Crossgen is currently not supported on the s390x, ppc64, ppc64le architecture as using mono instead of CoreCLR. -->
+   <Target Name="CrossgenLayout"
+-          Condition="'$(DISABLE_CROSSGEN)' == '' AND '$(Architecture)' != 's390x' AND '$(Architecture)' != 'ppc64le'"
++          Condition="'$(DISABLE_CROSSGEN)' == '' AND '$(Architecture)' != 's390x' AND '$(Architecture)' != 'ppc64' AND '$(Architecture)' != 'ppc64le'"
+           DependsOnTargets="SetSdkBrandingInfo">
+     <PropertyGroup>
+       <RuntimeNETCoreAppPackageName>microsoft.netcore.app.runtime.$(SharedFrameworkRid)</RuntimeNETCoreAppPackageName>
+diff --git a/src/Installer/redist-installer/targets/GenerateBundledVersions.targets b/src/Installer/redist-installer/targets/GenerateBundledVersions.targets
+index 26710f144b..592e75be65 100644
+--- a/src/Installer/redist-installer/targets/GenerateBundledVersions.targets
++++ b/src/Installer/redist-installer/targets/GenerateBundledVersions.targets
+@@ -191,6 +191,7 @@
+         linux-bionic-arm64;
+         linux-bionic-x64;
+         linux-bionic-x86;
++        linux-ppc64;
+         linux-ppc64le;
+         " />
+ 
+@@ -200,6 +201,7 @@
+         linux-bionic-arm64;
+         linux-bionic-x64;
+         linux-bionic-x86;
++        linux-ppc64;
+         linux-ppc64le;
+         " />
+ 
+@@ -418,6 +420,7 @@
+       <AspNetCore31RuntimePackRids Include="@(AspNetCore30RuntimePackRids)" />
+       <AspNetCore50RuntimePackRids Include="@(AspNetCore31RuntimePackRids);linux-musl-arm;win-arm64" />
+       <AspNetCore60RuntimePackRids Include="@(AspNetCore50RuntimePackRids);osx-arm64;linux-s390x;linux-loongarch64" />
++      <AspNetCore70RuntimePackRids Include="@(AspNetCore60RuntimePackRids);linux-ppc64" />
+       <AspNetCore70RuntimePackRids Include="@(AspNetCore60RuntimePackRids);linux-ppc64le" />
+       <AspNetCore80RuntimePackRids Include="@(AspNetCore70RuntimePackRids);freebsd-x64;freebsd-arm64" />
+       <AspNetCore80RuntimePackRids Remove="win-arm" />
+diff --git a/src/SourceBuild/content/test/Microsoft.DotNet.SourceBuild.SmokeTests/DotNetHelper.cs b/src/SourceBuild/content/test/Microsoft.DotNet.SourceBuild.SmokeTests/DotNetHelper.cs
+index 0b9e504014..7bb8a036c6 100644
+--- a/src/SourceBuild/content/test/Microsoft.DotNet.SourceBuild.SmokeTests/DotNetHelper.cs
++++ b/src/SourceBuild/content/test/Microsoft.DotNet.SourceBuild.SmokeTests/DotNetHelper.cs
+@@ -282,7 +282,7 @@ private static bool DetermineIsMonoRuntime(string dotnetRoot)
+     private static string GetProjectDirectory(string projectName) => Path.Combine(ProjectsDirectory, projectName);
+ 
+     public static bool ShouldPublishComplex() =>
+-        !string.Equals(Config.TargetArchitecture,"ppc64le") && !string.Equals(Config.TargetArchitecture,"s390x");
++        !string.Equals(Config.TargetArchitecture,"ppc64") && !string.Equals(Config.TargetArchitecture,"ppc64le") && !string.Equals(Config.TargetArchitecture,"s390x");
+ 
+     private class WebAppValidator
+     {
+diff --git a/src/SourceBuild/content/test/Microsoft.DotNet.SourceBuild.SmokeTests/OmniSharpTests.cs b/src/SourceBuild/content/test/Microsoft.DotNet.SourceBuild.SmokeTests/OmniSharpTests.cs
+index cd8dc6d31e..53db81d75a 100644
+--- a/src/SourceBuild/content/test/Microsoft.DotNet.SourceBuild.SmokeTests/OmniSharpTests.cs
++++ b/src/SourceBuild/content/test/Microsoft.DotNet.SourceBuild.SmokeTests/OmniSharpTests.cs
+@@ -24,7 +24,7 @@ public class OmniSharpTests : SdkTests
+ 
+     private string OmniSharpDirectory { get; } = Path.Combine(Directory.GetCurrentDirectory(), nameof(OmniSharpTests));
+ 
+-    public static bool IncludeOmniSharpTests => !Config.ExcludeOmniSharpTests && Config.TargetArchitecture != "ppc64le" && Config.TargetArchitecture != "s390x";
++    public static bool IncludeOmniSharpTests => !Config.ExcludeOmniSharpTests && Config.TargetArchitecture != "ppc64" && Config.TargetArchitecture != "ppc64le" && Config.TargetArchitecture != "s390x";
+ 
+     public OmniSharpTests(ITestOutputHelper outputHelper) : base(outputHelper) { }
+ 
+diff --git a/test/dotnet.Tests/EnvironmentVariableNamesTests.cs b/test/dotnet.Tests/EnvironmentVariableNamesTests.cs
+index ab741d9adf..1d6c28344f 100644
+--- a/test/dotnet.Tests/EnvironmentVariableNamesTests.cs
++++ b/test/dotnet.Tests/EnvironmentVariableNamesTests.cs
+@@ -16,6 +16,7 @@ public class EnvironmentVariableNamesTests
+     [InlineData("os.1.2-s390x", Architecture.S390x)]
+     [InlineData("os.1.2-loongarch64", Architecture.LoongArch64)]
+     [InlineData("os.1.2-armv6", Architecture.Armv6)]
++    [InlineData("os.1.2-ppc64", Architecture.Ppc64)]
+     [InlineData("os.1.2-ppc64le", Architecture.Ppc64le)]
+     [InlineData("os.1.2-lOOngaRch64", Architecture.LoongArch64)] // case-insensitive
+     [InlineData("os-x86", Architecture.X86)]
+-- 
+2.45.2
+

@@ -1,0 +1,72 @@
+From bcebf79a780cbd1427f56ee60bce10675aa582fa Mon Sep 17 00:00:00 2001
+From: Manuel Virgilio <real_virgil@yahoo.it>
+Date: Thu, 19 Dec 2024 00:09:26 +0100
+Subject: [PATCH 4/5] fix mono ppc64le specific branch
+
+---
+ src/mono/mono/mini/mini-ppc.c | 40 +++++++++++++++++------------------
+ 1 file changed, 19 insertions(+), 21 deletions(-)
+
+diff --git a/src/mono/mono/mini/mini-ppc.c b/src/mono/mono/mini/mini-ppc.c
+index 3cca8f1f378..1fa22727b3c 100644
+--- a/src/mono/mono/mini/mini-ppc.c
++++ b/src/mono/mono/mini/mini-ppc.c
+@@ -1225,10 +1225,7 @@ get_call_info (MonoMethodSignature *sig)
+ 						// doubles
+ 						FP_ALSO_IN_REG (gr += (n_in_regs));
+ 					}
+-				} else
+-#endif
+-				{
+-					if (is_all_floats && (mbr_cnt > 0)) {
++				} else if (is_all_floats && (mbr_cnt > 0)) {
+ 						rest = PPC_LAST_ARG_REG - gr + 1;
+ 						nregs = mbr_cnt;
+ 						n_in_regs = (rest >= mbr_cnt) ? MIN (rest, nregs) : 0;
+@@ -1238,25 +1235,26 @@ get_call_info (MonoMethodSignature *sig)
+ 						cinfo->args [n].vtsize = nregs - n_in_regs;
+ 						cinfo->args [n].reg = gr;
+ 						gr += n_in_regs;
+-					} else {
+-						align_size += (sizeof (target_mgreg_t) - 1);
+-						align_size &= ~(sizeof (target_mgreg_t) - 1);
+-						nregs = (align_size + sizeof (target_mgreg_t) -1 ) / sizeof (target_mgreg_t);
+-						n_in_regs = MIN (rest, nregs);
+-						if (n_in_regs < 0)
+-							n_in_regs = 0;
++				} else
++#endif
++				{
++					align_size += (sizeof (target_mgreg_t) - 1);
++					align_size &= ~(sizeof (target_mgreg_t) - 1);
++					nregs = (align_size + sizeof (target_mgreg_t) -1 ) / sizeof (target_mgreg_t);
++					n_in_regs = MIN (rest, nregs);
++					if (n_in_regs < 0)
++						n_in_regs = 0;
+ #ifdef __APPLE__
+-						/* FIXME: check this */
+-						if (size >= 3 && size % 4 != 0)
+-							n_in_regs = 0;
++					/* FIXME: check this */
++					if (size >= 3 && size % 4 != 0)
++						n_in_regs = 0;
+ #endif
+-						cinfo->args [n].regtype = RegTypeStructByVal;
+-						cinfo->args [n].vtregs = n_in_regs;
+-						cinfo->args [n].size = n_in_regs;
+-						cinfo->args [n].vtsize = nregs - n_in_regs;
+-						cinfo->args [n].reg = gr;
+-						gr += n_in_regs;
+-					}
++					cinfo->args [n].regtype = RegTypeStructByVal;
++					cinfo->args [n].vtregs = n_in_regs;
++					cinfo->args [n].size = n_in_regs;
++					cinfo->args [n].vtsize = nregs - n_in_regs;
++					cinfo->args [n].reg = gr;
++					gr += n_in_regs;
+ 				}
+ 
+ #ifdef TARGET_POWERPC64
+-- 
+2.45.2
+

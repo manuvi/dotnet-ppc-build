@@ -1,0 +1,1587 @@
+From 8e60799f9f521db120260c24a51dde74105092ec Mon Sep 17 00:00:00 2001
+From: Manuel Virgilio <real_virgil@yahoo.it>
+Date: Sun, 22 Dec 2024 14:30:29 +0100
+Subject: [PATCH 3/5] ppc64 update
+
+---
+ Directory.Build.props                         |   1 +
+ .../debug/daccess/ppc64/primitives.cpp        |   8 +
+ src/coreclr/debug/ee/ppc64/dbghelpers.S       |   8 +
+ src/coreclr/debug/ee/ppc64/primitives.cpp     |   9 +
+ src/coreclr/debug/ee/ppc64/walker.cpp         |   4 +
+ src/coreclr/debug/shared/ppc64/primitives.cpp |  15 ++
+ src/coreclr/inc/crosscomp.h                   |   2 +-
+ src/coreclr/inc/pedecoder.h                   |   2 +-
+ src/coreclr/inc/switches.h                    |   2 +-
+ src/coreclr/jit/CMakeLists.txt                |  22 +-
+ src/coreclr/pal/inc/unixasmmacros.inc         |   2 +-
+ ...crosppc64le.inc => unixasmmacrosppc64.inc} |   0
+ src/coreclr/pal/src/CMakeLists.txt            |   6 +-
+ src/coreclr/pal/src/arch/ppc64/asmconstants.h |  89 +++++++++
+ .../src/arch/ppc64/callsignalhandlerwrapper.S |  31 +++
+ src/coreclr/pal/src/arch/ppc64/context2.S     | 188 ++++++++++++++++++
+ src/coreclr/pal/src/arch/ppc64/debugbreak.S   |  10 +
+ .../pal/src/arch/ppc64/exceptionhelper.S      |  63 ++++++
+ .../src/arch/ppc64/signalhandlerhelper.cpp    |  68 +++++++
+ .../pal/src/arch/ppc64le/asmconstants.h       |   4 +-
+ .../pal/src/exception/remote-unwind.cpp       |   8 +-
+ src/coreclr/unwinder/ppc64/unwinder.cpp       |   4 +
+ src/coreclr/vm/ppc64/unixstubs.cpp            |  12 ++
+ .../pkg/projects/netcoreappRIDs.props         |   3 +
+ .../TestUtilities/System/PlatformDetection.cs |   1 +
+ .../src/runtime.json                          |  11 +
+ .../tests/ProcessThreadTests.Unix.cs          |   1 +
+ .../System.Private.CoreLib.Shared.projitems   |   4 +-
+ .../Runtime/InteropServices/Architecture.cs   |   4 +
+ .../InteropServices/RuntimeInformation.cs     |   2 +
+ .../System.Runtime/ref/System.Runtime.cs      |   1 +
+ .../CheckArchitectureTests.cs                 |   4 +
+ src/libraries/tests.proj                      |  11 +
+ src/mono/CMakeLists.txt                       |   9 +
+ .../System.Private.CoreLib.csproj             |   5 +-
+ .../System.Private.CoreLib.sln                |  69 +++++++
+ src/mono/mono.proj                            |   6 +
+ src/native/corehost/hostmisc/pal.h            |   1 +
+ src/native/corehost/hostmisc/utils.cpp        |   3 +
+ src/native/eventpipe/ds-portable-rid.c        |   2 +
+ src/native/eventpipe/ep-event-source.c        |   2 +
+ src/native/external/libunwind.cmake           |  33 +++
+ .../external/libunwind_extras/CMakeLists.txt  |   2 +
+ .../System.Native/pal_runtimeinformation.c    |   5 +-
+ 44 files changed, 716 insertions(+), 21 deletions(-)
+ create mode 100644 src/coreclr/debug/daccess/ppc64/primitives.cpp
+ create mode 100644 src/coreclr/debug/ee/ppc64/dbghelpers.S
+ create mode 100644 src/coreclr/debug/ee/ppc64/primitives.cpp
+ create mode 100644 src/coreclr/debug/ee/ppc64/walker.cpp
+ create mode 100644 src/coreclr/debug/shared/ppc64/primitives.cpp
+ rename src/coreclr/pal/inc/{unixasmmacrosppc64le.inc => unixasmmacrosppc64.inc} (100%)
+ create mode 100644 src/coreclr/pal/src/arch/ppc64/asmconstants.h
+ create mode 100644 src/coreclr/pal/src/arch/ppc64/callsignalhandlerwrapper.S
+ create mode 100644 src/coreclr/pal/src/arch/ppc64/context2.S
+ create mode 100644 src/coreclr/pal/src/arch/ppc64/debugbreak.S
+ create mode 100644 src/coreclr/pal/src/arch/ppc64/exceptionhelper.S
+ create mode 100644 src/coreclr/pal/src/arch/ppc64/signalhandlerhelper.cpp
+ create mode 100644 src/coreclr/unwinder/ppc64/unwinder.cpp
+ create mode 100644 src/coreclr/vm/ppc64/unixstubs.cpp
+
+diff --git a/Directory.Build.props b/Directory.Build.props
+index 688fcaec63b..576024b1632 100644
+--- a/Directory.Build.props
++++ b/Directory.Build.props
+@@ -44,6 +44,7 @@
+     <TargetArchitecture Condition="'$(TargetArchitecture)' == '' and '$(_hostArch)' == 'arm64'">arm64</TargetArchitecture>
+     <TargetArchitecture Condition="'$(TargetArchitecture)' == '' and '$(_hostArch)' == 'loongarch64'">loongarch64</TargetArchitecture>
+     <TargetArchitecture Condition="'$(TargetArchitecture)' == '' and '$(_hostArch)' == 's390x'">s390x</TargetArchitecture>
++    <TargetArchitecture Condition="'$(TargetArchitecture)' == '' and '$(_hostArch)' == 'ppc64'">ppc64</TargetArchitecture>
+     <TargetArchitecture Condition="'$(TargetArchitecture)' == '' and '$(_hostArch)' == 'ppc64le'">ppc64le</TargetArchitecture>
+     <TargetArchitecture Condition="'$(TargetArchitecture)' == '' and '$(TargetsMobile)' == 'true'">x64</TargetArchitecture>
+     <TargetArchitecture Condition="'$(TargetArchitecture)' == ''">x64</TargetArchitecture>
+diff --git a/src/coreclr/debug/daccess/ppc64/primitives.cpp b/src/coreclr/debug/daccess/ppc64/primitives.cpp
+new file mode 100644
+index 00000000000..0b9977c9a45
+--- /dev/null
++++ b/src/coreclr/debug/daccess/ppc64/primitives.cpp
+@@ -0,0 +1,8 @@
++// Licensed to the .NET Foundation under one or more agreements.
++// The .NET Foundation licenses this file to you under the MIT license.
++
++//
++
++#include "stdafx.h"
++
++#include "../../shared/ppc64/primitives.cpp"
+diff --git a/src/coreclr/debug/ee/ppc64/dbghelpers.S b/src/coreclr/debug/ee/ppc64/dbghelpers.S
+new file mode 100644
+index 00000000000..a1ec6639451
+--- /dev/null
++++ b/src/coreclr/debug/ee/ppc64/dbghelpers.S
+@@ -0,0 +1,8 @@
++// Licensed to the .NET Foundation under one or more agreements.
++// The .NET Foundation licenses this file to you under the MIT license.
++
++#include "asmconstants.h"
++#include "unixasmmacros.inc"
++
++#error Unsupported platform
++
+diff --git a/src/coreclr/debug/ee/ppc64/primitives.cpp b/src/coreclr/debug/ee/ppc64/primitives.cpp
+new file mode 100644
+index 00000000000..e3e4440bb20
+--- /dev/null
++++ b/src/coreclr/debug/ee/ppc64/primitives.cpp
+@@ -0,0 +1,9 @@
++// Licensed to the .NET Foundation under one or more agreements.
++// The .NET Foundation licenses this file to you under the MIT license.
++
++//
++
++#include "stdafx.h"
++#include "threads.h"
++#include "../../shared/ppc64/primitives.cpp"
++
+diff --git a/src/coreclr/debug/ee/ppc64/walker.cpp b/src/coreclr/debug/ee/ppc64/walker.cpp
+new file mode 100644
+index 00000000000..b2674972672
+--- /dev/null
++++ b/src/coreclr/debug/ee/ppc64/walker.cpp
+@@ -0,0 +1,4 @@
++// Licensed to the .NET Foundation under one or more agreements.
++// The .NET Foundation licenses this file to you under the MIT license.
++
++#error Unsupported platform
+diff --git a/src/coreclr/debug/shared/ppc64/primitives.cpp b/src/coreclr/debug/shared/ppc64/primitives.cpp
+new file mode 100644
+index 00000000000..cb4be30c89b
+--- /dev/null
++++ b/src/coreclr/debug/shared/ppc64/primitives.cpp
+@@ -0,0 +1,15 @@
++// Licensed to the .NET Foundation under one or more agreements.
++// The .NET Foundation licenses this file to you under the MIT license.
++//*****************************************************************************
++// File: primitives.cpp
++//
++
++//
++// Platform-specific debugger primitives
++//
++//*****************************************************************************
++
++#include "primitives.h"
++
++#error Unsupported platform
++
+diff --git a/src/coreclr/inc/crosscomp.h b/src/coreclr/inc/crosscomp.h
+index 10a196302f3..11a56198248 100644
+--- a/src/coreclr/inc/crosscomp.h
++++ b/src/coreclr/inc/crosscomp.h
+@@ -710,7 +710,7 @@ typedef struct _T_KNONVOLATILE_CONTEXT_POINTERS {
+ #define DAC_CS_NATIVE_DATA_SIZE 96
+ #elif defined(TARGET_LINUX) && defined(TARGET_RISCV64)
+ #define DAC_CS_NATIVE_DATA_SIZE 96
+-#elif defined(TARGET_LINUX) && defined(TARGET_POWERPC64)
++#elif defined(TARGET_LINUX) && (defined(TARGET_POWERPC64)||defined(TARGET_POWERPC64LE))
+ #define DAC_CS_NATIVE_DATA_SIZE 96
+ #elif defined(TARGET_NETBSD) && defined(TARGET_AMD64)
+ #define DAC_CS_NATIVE_DATA_SIZE 96
+diff --git a/src/coreclr/inc/pedecoder.h b/src/coreclr/inc/pedecoder.h
+index 057dfa9a25d..b3b22a38d06 100644
+--- a/src/coreclr/inc/pedecoder.h
++++ b/src/coreclr/inc/pedecoder.h
+@@ -83,7 +83,7 @@ inline CHECK CheckOverflow(RVA value1, COUNT_T value2)
+ #define IMAGE_FILE_MACHINE_NATIVE   IMAGE_FILE_MACHINE_ARM64
+ #elif defined(TARGET_LOONGARCH64)
+ #define IMAGE_FILE_MACHINE_NATIVE   IMAGE_FILE_MACHINE_LOONGARCH64
+-#elif defined(TARGET_POWERPC64)
++#elif defined(TARGET_POWERPC64) || defined(TARGET_POWERPC64LE)
+ #define IMAGE_FILE_MACHINE_NATIVE   IMAGE_FILE_MACHINE_POWERPC
+ #elif defined(TARGET_S390X)
+ #define IMAGE_FILE_MACHINE_NATIVE   IMAGE_FILE_MACHINE_UNKNOWN
+diff --git a/src/coreclr/inc/switches.h b/src/coreclr/inc/switches.h
+index 06fdaa5f397..fa9f978c778 100644
+--- a/src/coreclr/inc/switches.h
++++ b/src/coreclr/inc/switches.h
+@@ -46,7 +46,7 @@
+ #if defined(TARGET_X86) || defined(TARGET_ARM)
+     #define USE_LAZY_PREFERRED_RANGE       0
+ 
+-#elif defined(TARGET_AMD64) || defined(TARGET_ARM64) || defined(TARGET_S390X) || defined(TARGET_LOONGARCH64) || defined(TARGET_POWERPC64) || defined(TARGET_RISCV64)
++#elif defined(TARGET_AMD64) || defined(TARGET_ARM64) || defined(TARGET_S390X) || defined(TARGET_LOONGARCH64) || defined(TARGET_POWERPC64) || defined(TARGET_POWERPC64LE) || defined(TARGET_RISCV64)
+ 
+ #if defined(HOST_UNIX)
+     // In PAL we have a smechanism that reserves memory on start up that is
+diff --git a/src/coreclr/jit/CMakeLists.txt b/src/coreclr/jit/CMakeLists.txt
+index ddbe3c215b0..6ff33ba8700 100644
+--- a/src/coreclr/jit/CMakeLists.txt
++++ b/src/coreclr/jit/CMakeLists.txt
+@@ -45,9 +45,12 @@ function(create_standalone_jit)
+   elseif(TARGETDETAILS_ARCH STREQUAL "s390x")
+     set(JIT_ARCH_SOURCES ${JIT_S390X_SOURCES})
+     set(JIT_ARCH_HEADERS ${JIT_S390X_HEADERS})
+-  elseif(TARGETDETAILS_ARCH STREQUAL "ppc64le")
++  elseif(TARGETDETAILS_ARCH STREQUAL "ppc64")
+     set(JIT_ARCH_SOURCES ${JIT_POWERPC64_SOURCES})
+     set(JIT_ARCH_HEADERS ${JIT_POWERPC64_HEADERS})
++  elseif(TARGETDETAILS_ARCH STREQUAL "ppc64le")
++    set(JIT_ARCH_SOURCES ${JIT_POWERPC64LE_SOURCES})
++    set(JIT_ARCH_HEADERS ${JIT_POWERPC64LE_HEADERS})
+   elseif(TARGETDETAILS_ARCH STREQUAL "loongarch64")
+     set(JIT_ARCH_SOURCES ${JIT_LOONGARCH64_SOURCES})
+     set(JIT_ARCH_HEADERS ${JIT_LOONGARCH64_HEADERS})
+@@ -265,6 +268,10 @@ set( JIT_POWERPC64_SOURCES
+   # Not supported as JIT target
+ )
+ 
++set( JIT_POWERPC64LE_SOURCES
++  # Not supported as JIT target
++)
++
+ set( JIT_LOONGARCH64_SOURCES
+   codegenloongarch64.cpp
+   emitloongarch64.cpp
+@@ -441,6 +448,10 @@ set ( JIT_POWERPC64_HEADERS
+   # Not supported as JIT target
+ )
+ 
++set ( JIT_POWERPC64LE_HEADERS
++  # Not supported as JIT target
++)
++
+ set( JIT_LOONGARCH64_HEADERS
+     emitloongarch64.h
+     emitfmtsloongarch64.h
+@@ -496,9 +507,12 @@ elseif(CLR_CMAKE_TARGET_ARCH_ARM64)
+ elseif(CLR_CMAKE_TARGET_ARCH_S390X)
+   set(JIT_ARCH_SOURCES ${JIT_S390X_SOURCES})
+   set(JIT_ARCH_HEADERS ${JIT_S390X_HEADERS})
+-elseif(CLR_CMAKE_TARGET_ARCH_POWERPC64LE)
++elseif(CLR_CMAKE_TARGET_ARCH_POWERPC64)
+   set(JIT_ARCH_SOURCES ${JIT_POWERPC64_SOURCES})
+   set(JIT_ARCH_HEADERS ${JIT_POWERPC64_HEADERS})
++elseif(CLR_CMAKE_TARGET_ARCH_POWERPC64LE)
++  set(JIT_ARCH_SOURCES ${JIT_POWERPC64LE_SOURCES})
++  set(JIT_ARCH_HEADERS ${JIT_POWERPC64LE_HEADERS})
+ elseif(CLR_CMAKE_TARGET_ARCH_LOONGARCH64)
+   set(JIT_ARCH_SOURCES ${JIT_LOONGARCH64_SOURCES})
+   set(JIT_ARCH_HEADERS ${JIT_LOONGARCH64_HEADERS})
+@@ -666,13 +680,13 @@ if (CLR_CMAKE_TARGET_ARCH_I386 AND CLR_CMAKE_TARGET_UNIX)
+ endif (CLR_CMAKE_TARGET_ARCH_I386 AND CLR_CMAKE_TARGET_UNIX)
+ 
+ if (CLR_CMAKE_TARGET_UNIX)
+-    if (NOT ARCH_TARGET_NAME STREQUAL s390x AND NOT ARCH_TARGET_NAME STREQUAL armv6 AND NOT ARCH_TARGET_NAME STREQUAL ppc64le AND NOT ARCH_TARGET_NAME STREQUAL riscv64)
++    if (NOT ARCH_TARGET_NAME STREQUAL s390x AND NOT ARCH_TARGET_NAME STREQUAL armv6 AND NOT ARCH_TARGET_NAME STREQUAL ppc64 AND NOT ARCH_TARGET_NAME STREQUAL ppc64le AND NOT ARCH_TARGET_NAME STREQUAL riscv64)
+       if(CLR_CMAKE_TARGET_ARCH_ARM OR CLR_CMAKE_TARGET_ARCH_ARM64)
+         install_clr(TARGETS clrjit_universal_${ARCH_TARGET_NAME}_${ARCH_HOST_NAME} DESTINATIONS . COMPONENT jit)
+       else()
+         install_clr(TARGETS clrjit_unix_${ARCH_TARGET_NAME}_${ARCH_HOST_NAME} DESTINATIONS . COMPONENT jit)
+       endif()
+-    endif(NOT ARCH_TARGET_NAME STREQUAL s390x AND NOT ARCH_TARGET_NAME STREQUAL armv6 AND NOT ARCH_TARGET_NAME STREQUAL ppc64le AND NOT ARCH_TARGET_NAME STREQUAL riscv64)
++    endif(NOT ARCH_TARGET_NAME STREQUAL s390x AND NOT ARCH_TARGET_NAME STREQUAL armv6 AND NOT ARCH_TARGET_NAME STREQUAL ppc64 AND NOT ARCH_TARGET_NAME STREQUAL ppc64le AND NOT ARCH_TARGET_NAME STREQUAL riscv64)
+ endif()
+ 
+ if (CLR_CMAKE_TARGET_WIN32 AND CLR_CMAKE_PGO_INSTRUMENT)
+diff --git a/src/coreclr/pal/inc/unixasmmacros.inc b/src/coreclr/pal/inc/unixasmmacros.inc
+index 120b26543e3..e3b9802c9ae 100644
+--- a/src/coreclr/pal/inc/unixasmmacros.inc
++++ b/src/coreclr/pal/inc/unixasmmacros.inc
+@@ -55,5 +55,5 @@
+ #elif defined(HOST_RISCV64)
+ #include "unixasmmacrosriscv64.inc"
+ #elif defined(HOST_POWERPC64)
+-#include "unixasmmacrosppc64le.inc"
++#include "unixasmmacrosppc64.inc"
+ #endif
+diff --git a/src/coreclr/pal/inc/unixasmmacrosppc64le.inc b/src/coreclr/pal/inc/unixasmmacrosppc64.inc
+similarity index 100%
+rename from src/coreclr/pal/inc/unixasmmacrosppc64le.inc
+rename to src/coreclr/pal/inc/unixasmmacrosppc64.inc
+diff --git a/src/coreclr/pal/src/CMakeLists.txt b/src/coreclr/pal/src/CMakeLists.txt
+index 9f3425c4adb..27e59f09067 100644
+--- a/src/coreclr/pal/src/CMakeLists.txt
++++ b/src/coreclr/pal/src/CMakeLists.txt
+@@ -57,6 +57,8 @@ elseif(CLR_CMAKE_HOST_ARCH_I386)
+   set(PAL_ARCH_SOURCES_DIR i386)
+ elseif(CLR_CMAKE_HOST_ARCH_S390X)
+   set(PAL_ARCH_SOURCES_DIR s390x)
++elseif(CLR_CMAKE_HOST_ARCH_POWERPC64)
++  set(PAL_ARCH_SOURCES_DIR ppc64)
+ elseif(CLR_CMAKE_HOST_ARCH_POWERPC64LE)
+   set(PAL_ARCH_SOURCES_DIR ppc64le)
+ endif()
+@@ -309,9 +311,9 @@ if(CLR_CMAKE_TARGET_LINUX)
+   endif(CLR_CMAKE_USE_SYSTEM_LIBUNWIND)
+ 
+   # bundled libunwind requires using libucontext on alpine and x86 and ppc64le
+-  if(CLR_CMAKE_TARGET_LINUX_MUSL AND (CLR_CMAKE_TARGET_ARCH_I386 OR CLR_CMAKE_TARGET_ARCH_POWERPC64LE))
++  if(CLR_CMAKE_TARGET_LINUX_MUSL AND (CLR_CMAKE_TARGET_ARCH_I386 OR CLR_CMAKE_TARGET_ARCH_POWERPC64 OR CLR_CMAKE_TARGET_ARCH_POWERPC64LE))
+     target_link_libraries(coreclrpal PUBLIC ucontext)
+-  endif(CLR_CMAKE_TARGET_LINUX_MUSL AND (CLR_CMAKE_TARGET_ARCH_I386 OR CLR_CMAKE_TARGET_ARCH_POWERPC64LE))
++  endif(CLR_CMAKE_TARGET_LINUX_MUSL AND (CLR_CMAKE_TARGET_ARCH_I386 OR CLR_CMAKE_TARGET_ARCH_POWERPC64 OR CLR_CMAKE_TARGET_ARCH_POWERPC64LE))
+ 
+ endif(CLR_CMAKE_TARGET_LINUX)
+ 
+diff --git a/src/coreclr/pal/src/arch/ppc64/asmconstants.h b/src/coreclr/pal/src/arch/ppc64/asmconstants.h
+new file mode 100644
+index 00000000000..15ee945dafa
+--- /dev/null
++++ b/src/coreclr/pal/src/arch/ppc64/asmconstants.h
+@@ -0,0 +1,89 @@
++// Licensed to the .NET Foundation under one or more agreements.
++// The .NET Foundation licenses this file to you under the MIT license.
++
++#ifndef __PAL_POWERPC_ASMCONSTANTS_H__
++#define __PAL_POWERPC_ASMCONSTANTS_H__
++
++#define CONTEXT_PPC64   0x100000
++
++#define CONTEXT_CONTROL 1 
++#define CONTEXT_INTEGER 2 
++#define CONTEXT_FLOATING_POINT 4 
++
++#define CONTEXT_FULL (CONTEXT_CONTROL | CONTEXT_INTEGER | CONTEXT_FLOATING_POINT)
++
++#define CONTEXT_ContextFlags  0
++#define CONTEXT_R0            CONTEXT_ContextFlags+8
++#define CONTEXT_R1            CONTEXT_R0+8
++#define CONTEXT_R2            CONTEXT_R1+8
++#define CONTEXT_R3            CONTEXT_R2+8
++#define CONTEXT_R4            CONTEXT_R3+8
++#define CONTEXT_R5            CONTEXT_R4+8
++#define CONTEXT_R6            CONTEXT_R5+8
++#define CONTEXT_R7            CONTEXT_R6+8
++#define CONTEXT_R8            CONTEXT_R7+8
++#define CONTEXT_R9            CONTEXT_R8+8
++#define CONTEXT_R10           CONTEXT_R9+8
++#define CONTEXT_R11           CONTEXT_R10+8
++#define CONTEXT_R12           CONTEXT_R11+8
++#define CONTEXT_R13           CONTEXT_R12+8
++#define CONTEXT_R14           CONTEXT_R13+8
++#define CONTEXT_R15           CONTEXT_R14+8
++#define CONTEXT_R16           CONTEXT_R15+8
++#define CONTEXT_R17           CONTEXT_R16+8
++#define CONTEXT_R18           CONTEXT_R17+8
++#define CONTEXT_R19           CONTEXT_R18+8
++#define CONTEXT_R20           CONTEXT_R19+8
++#define CONTEXT_R21           CONTEXT_R20+8
++#define CONTEXT_R22           CONTEXT_R21+8
++#define CONTEXT_R23           CONTEXT_R22+8
++#define CONTEXT_R24           CONTEXT_R23+8
++#define CONTEXT_R25           CONTEXT_R24+8
++#define CONTEXT_R26           CONTEXT_R25+8
++#define CONTEXT_R27           CONTEXT_R26+8
++#define CONTEXT_R28           CONTEXT_R27+8
++#define CONTEXT_R29           CONTEXT_R28+8
++#define CONTEXT_R30           CONTEXT_R29+8
++#define CONTEXT_R31           CONTEXT_R30+8
++#define CONTEXT_F0            CONTEXT_R31+8
++#define CONTEXT_F1            CONTEXT_F0+8
++#define CONTEXT_F2            CONTEXT_F1+8
++#define CONTEXT_F3            CONTEXT_F2+8
++#define CONTEXT_F4            CONTEXT_F3+8
++#define CONTEXT_F5            CONTEXT_F4+8
++#define CONTEXT_F6            CONTEXT_F5+8
++#define CONTEXT_F7            CONTEXT_F6+8
++#define CONTEXT_F8            CONTEXT_F7+8
++#define CONTEXT_F9            CONTEXT_F8+8
++#define CONTEXT_F10           CONTEXT_F9+8
++#define CONTEXT_F11           CONTEXT_F10+8
++#define CONTEXT_F12           CONTEXT_F11+8
++#define CONTEXT_F13           CONTEXT_F12+8
++#define CONTEXT_F14           CONTEXT_F13+8
++#define CONTEXT_F15           CONTEXT_F14+8
++#define CONTEXT_F16           CONTEXT_F15+8
++#define CONTEXT_F17           CONTEXT_F16+8
++#define CONTEXT_F18           CONTEXT_F17+8
++#define CONTEXT_F19           CONTEXT_F18+8
++#define CONTEXT_F20           CONTEXT_F19+8
++#define CONTEXT_F21           CONTEXT_F20+8
++#define CONTEXT_F22           CONTEXT_F21+8
++#define CONTEXT_F23           CONTEXT_F22+8
++#define CONTEXT_F24           CONTEXT_F23+8
++#define CONTEXT_F25           CONTEXT_F24+8
++#define CONTEXT_F26           CONTEXT_F25+8
++#define CONTEXT_F27           CONTEXT_F26+8
++#define CONTEXT_F28           CONTEXT_F27+8
++#define CONTEXT_F29           CONTEXT_F28+8
++#define CONTEXT_F30           CONTEXT_F29+8
++#define CONTEXT_F31           CONTEXT_F30+8
++#define CONTEXT_FPSCR         CONTEXT_F31+8
++#define CONTEXT_NIP           CONTEXT_FPSCR+8
++#define CONTEXT_MSR           CONTEXT_NIP+8
++#define CONTEXT_CTR           CONTEXT_MSR+8
++#define CONTEXT_LINK          CONTEXT_CTR+8
++#define CONTEXT_XER           CONTEXT_LINK+8
++#define CONTEXT_CCR           CONTEXT_XER+8
++#define CONTEXT_Size          CONTEXT_CCR+8
++
++#endif
+diff --git a/src/coreclr/pal/src/arch/ppc64/callsignalhandlerwrapper.S b/src/coreclr/pal/src/arch/ppc64/callsignalhandlerwrapper.S
+new file mode 100644
+index 00000000000..1ace1393c3f
+--- /dev/null
++++ b/src/coreclr/pal/src/arch/ppc64/callsignalhandlerwrapper.S
+@@ -0,0 +1,31 @@
++// Licensed to the .NET Foundation under one or more agreements.
++// The .NET Foundation licenses this file to you under the MIT license.
++
++#include "unixasmmacros.inc"
++#include "asmconstants.h"
++
++.macro CALL_SIGNAL_HANDLER_WRAPPER Alignment
++
++.globl C_FUNC(SignalHandlerWorkerReturnOffset\Alignment)
++C_FUNC(SignalHandlerWorkerReturnOffset\Alignment):
++    .int LOCAL_LABEL(SignalHandlerWorkerReturn\Alignment)-C_FUNC(CallSignalHandlerWrapper\Alignment)
++
++// This function is never called, only a fake stack frame will be setup to have a return
++// address set to SignalHandlerWorkerReturn during SIGSEGV handling.
++// It enables the unwinder to unwind stack from the handling code to the actual failure site.
++NESTED_ENTRY CallSignalHandlerWrapper\Alignment, _TEXT, NoHandler
++    mflr %r0
++	std %r0, 16(%r1)
++    stdu %r1,-32(%r1)
++    bl      EXTERNAL_C_FUNC(signal_handler_worker)
++LOCAL_LABEL(SignalHandlerWorkerReturn\Alignment):
++    addi %r1, %r1, 32
++    ld %r0, 16(%r1)
++    mtlr %r0
++    blr
++NESTED_END CallSignalHandlerWrapper\Alignment, _TEXT
++
++.endm
++
++CALL_SIGNAL_HANDLER_WRAPPER 0
++CALL_SIGNAL_HANDLER_WRAPPER 8
+diff --git a/src/coreclr/pal/src/arch/ppc64/context2.S b/src/coreclr/pal/src/arch/ppc64/context2.S
+new file mode 100644
+index 00000000000..f48c7414ae6
+--- /dev/null
++++ b/src/coreclr/pal/src/arch/ppc64/context2.S
+@@ -0,0 +1,188 @@
++// Licensed to the .NET Foundation under one or more agreements.
++// The .NET Foundation licenses this file to you under the MIT license.
++//
++// Implementation of _CONTEXT_CaptureContext for the IBM power ppc64le platform.
++// This function is processor dependent.  It is used by exception handling,
++// and is always apply to the current thread.
++//
++
++#include "unixasmmacros.inc"
++#include "asmconstants.h"
++
++// Incoming:
++//  R3: Context*
++//
++LEAF_ENTRY CONTEXT_CaptureContext, _TEXT
++
++	// Store all general purpose registers
++	std %r0, CONTEXT_R0(%r3)
++	std %r1, CONTEXT_R1(%r3)
++	std %r2, CONTEXT_R2(%r3)
++	std %r3, CONTEXT_R3(%r3)
++	std %r4, CONTEXT_R4(%r3)
++	std %r5, CONTEXT_R5(%r3)
++	std %r6, CONTEXT_R6(%r3)
++	std %r7, CONTEXT_R7(%r3)
++	std %r8, CONTEXT_R8(%r3)
++	std %r9, CONTEXT_R9(%r3)
++	std %r10, CONTEXT_R10(%r3)
++	std %r11, CONTEXT_R11(%r3)
++	std %r12, CONTEXT_R12(%r3)
++	std %r13, CONTEXT_R13(%r3)
++	std %r14, CONTEXT_R14(%r3)
++	std %r15, CONTEXT_R15(%r3)
++	std %r16, CONTEXT_R16(%r3)
++	std %r17, CONTEXT_R17(%r3)
++	std %r18, CONTEXT_R18(%r3)
++	std %r19, CONTEXT_R19(%r3)
++	std %r20, CONTEXT_R20(%r3)
++	std %r21, CONTEXT_R21(%r3)
++	std %r22, CONTEXT_R22(%r3)
++	std %r23, CONTEXT_R23(%r3)
++	std %r24, CONTEXT_R24(%r3)
++	std %r25, CONTEXT_R25(%r3)
++	std %r26, CONTEXT_R26(%r3)
++	std %r27, CONTEXT_R27(%r3)
++	std %r28, CONTEXT_R28(%r3)
++	std %r29, CONTEXT_R29(%r3)
++	std %r30, CONTEXT_R30(%r3)
++	std %r31, CONTEXT_R31(%r3)
++
++	// Store all floating point registers
++	stfd %f0, CONTEXT_F0(%r3)
++	stfd %f1, CONTEXT_F1(%r3)
++	stfd %f2, CONTEXT_F2(%r3)
++	stfd %f3, CONTEXT_F3(%r3)
++	stfd %f4, CONTEXT_F4(%r3)
++	stfd %f5, CONTEXT_F5(%r3)
++	stfd %f6, CONTEXT_F6(%r3)
++	stfd %f7, CONTEXT_F7(%r3)
++	stfd %f8, CONTEXT_F8(%r3)
++	stfd %f9, CONTEXT_F9(%r3)
++	stfd %f10, CONTEXT_F10(%r3)
++	stfd %f11, CONTEXT_F11(%r3)
++	stfd %f12, CONTEXT_F12(%r3)
++	stfd %f13, CONTEXT_F13(%r3)
++	stfd %f14, CONTEXT_F14(%r3)
++	stfd %f15, CONTEXT_F15(%r3)
++	stfd %f16, CONTEXT_F16(%r3)
++	stfd %f17, CONTEXT_F17(%r3)
++	stfd %f18, CONTEXT_F18(%r3)
++	stfd %f19, CONTEXT_F19(%r3)
++	stfd %f20, CONTEXT_F20(%r3)
++	stfd %f21, CONTEXT_F21(%r3)
++	stfd %f22, CONTEXT_F22(%r3)
++	stfd %f23, CONTEXT_F23(%r3)
++	stfd %f24, CONTEXT_F24(%r3)
++	stfd %f25, CONTEXT_F25(%r3)
++	stfd %f26, CONTEXT_F26(%r3)
++	stfd %f27, CONTEXT_F27(%r3)
++	stfd %f28, CONTEXT_F28(%r3)
++	stfd %f29, CONTEXT_F29(%r3)
++	stfd %f30, CONTEXT_F30(%r3)
++	stfd %f31, CONTEXT_F31(%r3)
++
++	// Save Control Registers - XER, LR and CTR
++	mfspr 5, 1
++	std %r5, CONTEXT_XER(%r3)
++	mflr %r5
++	std %r5, CONTEXT_LINK(%r3)
++	mfspr 5, 9
++	std %r5, CONTEXT_CTR(%r3)
++
++	// Restore r5 general purpose register
++	ld %r5, CONTEXT_R5(%r3)
++	
++	blr
++LEAF_END CONTEXT_CaptureContext, _TEXT
++
++LEAF_ENTRY RtlCaptureContext, _TEXT
++	b C_FUNC(CONTEXT_CaptureContext)
++LEAF_END RtlCaptureContext, _TEXT
++
++LEAF_ENTRY RtlRestoreContext, _TEXT
++
++	// Restore all floating point registers
++	lfd %f0, CONTEXT_F0(%r3)
++	lfd %f1, CONTEXT_F1(%r3)
++	lfd %f2, CONTEXT_F2(%r3)
++	lfd %f3, CONTEXT_F3(%r3)
++	lfd %f4, CONTEXT_F4(%r3)
++	lfd %f5, CONTEXT_F5(%r3)
++	lfd %f6, CONTEXT_F6(%r3)
++	lfd %f7, CONTEXT_F7(%r3)
++	lfd %f8, CONTEXT_F8(%r3)
++	lfd %f9, CONTEXT_F9(%r3)
++	lfd %f10, CONTEXT_F10(%r3)
++	lfd %f11, CONTEXT_F11(%r3)
++	lfd %f12, CONTEXT_F12(%r3)
++	lfd %f13, CONTEXT_F13(%r3)
++	lfd %f14, CONTEXT_F14(%r3)
++	lfd %f15, CONTEXT_F15(%r3)
++	lfd %f16, CONTEXT_F16(%r3)
++	lfd %f17, CONTEXT_F17(%r3)
++	lfd %f18, CONTEXT_F18(%r3)
++	lfd %f19, CONTEXT_F19(%r3)
++	lfd %f20, CONTEXT_F20(%r3)
++	lfd %f21, CONTEXT_F21(%r3)
++	lfd %f22, CONTEXT_F22(%r3)
++	lfd %f23, CONTEXT_F23(%r3)
++	lfd %f24, CONTEXT_F24(%r3)
++	lfd %f25, CONTEXT_F25(%r3)
++	lfd %f26, CONTEXT_F26(%r3)
++	lfd %f27, CONTEXT_F27(%r3)
++	lfd %f28, CONTEXT_F28(%r3)
++	lfd %f29, CONTEXT_F29(%r3)
++	lfd %f30, CONTEXT_F30(%r3)
++	lfd %f31, CONTEXT_F31(%r3)
++
++	// Restore all general purpose registers
++	ld %r0, CONTEXT_R0(%R3)
++	ld %r1, CONTEXT_R1(%r3)
++	ld %r2, CONTEXT_R2(%r3)
++	ld %r4, CONTEXT_R4(%r3)
++	ld %r5, CONTEXT_R5(%r3)
++	ld %r6, CONTEXT_R6(%r3)
++	ld %r7, CONTEXT_R7(%r3)
++	ld %r8, CONTEXT_R8(%r3)
++	ld %r9, CONTEXT_R9(%r3)
++	ld %r10, CONTEXT_R10(%r3)
++	ld %r11, CONTEXT_R11(%r3)
++	ld %r12, CONTEXT_R12(%r3)
++	ld %r13, CONTEXT_R13(%r3)
++	ld %r14, CONTEXT_R14(%r3)
++	ld %r15, CONTEXT_R15(%r3)
++	ld %r16, CONTEXT_R16(%r3)
++	ld %r17, CONTEXT_R17(%r3)
++	ld %r18, CONTEXT_R18(%r3)
++	ld %r19, CONTEXT_R19(%r3)
++	ld %r20, CONTEXT_R20(%r3)
++	ld %r21, CONTEXT_R21(%r3)
++	ld %r22, CONTEXT_R22(%r3)
++	ld %r23, CONTEXT_R23(%r3)
++	ld %r24, CONTEXT_R24(%r3)
++	ld %r25, CONTEXT_R25(%r3)
++	ld %r26, CONTEXT_R26(%r3)
++	ld %r27, CONTEXT_R27(%r3)
++	ld %r28, CONTEXT_R28(%r3)
++	ld %r29, CONTEXT_R29(%r3)
++	ld %r30, CONTEXT_R30(%r3)
++	ld %r31, CONTEXT_R31(%r3)
++
++	// Restore Control Register - XER
++	ld %r12, CONTEXT_XER(%r3)
++	mtspr 1, 12
++
++	// Restore Control Register - LR
++	mtlr %r0
++
++	// Restore Control Register - CTR
++	ld %r12, CONTEXT_LINK(%r3)
++	mtctr %r12
++
++	// Restore R3 register
++	ld %r3, CONTEXT_R3(%r3)
++
++	// Branch to CTR register location
++	bctr
++LEAF_END RtlRestoreContext, _TEXT
+diff --git a/src/coreclr/pal/src/arch/ppc64/debugbreak.S b/src/coreclr/pal/src/arch/ppc64/debugbreak.S
+new file mode 100644
+index 00000000000..8ff9c9c40cf
+--- /dev/null
++++ b/src/coreclr/pal/src/arch/ppc64/debugbreak.S
+@@ -0,0 +1,10 @@
++// Licensed to the .NET Foundation under one or more agreements.
++// The .NET Foundation licenses this file to you under the MIT license.
++
++#include "unixasmmacros.inc"
++
++LEAF_ENTRY DBG_DebugBreak, _TEXT
++	bl abort
++	nop
++LEAF_END_MARKED DBG_DebugBreak, _TEXT
++
+diff --git a/src/coreclr/pal/src/arch/ppc64/exceptionhelper.S b/src/coreclr/pal/src/arch/ppc64/exceptionhelper.S
+new file mode 100644
+index 00000000000..9c3d9f4881a
+--- /dev/null
++++ b/src/coreclr/pal/src/arch/ppc64/exceptionhelper.S
+@@ -0,0 +1,63 @@
++// Licensed to the .NET Foundation under one or more agreements.
++// The .NET Foundation licenses this file to you under the MIT license.
++
++#include "unixasmmacros.inc"
++#include "asmconstants.h"
++
++//////////////////////////////////////////////////////////////////////////
++//
++// This function creates a stack frame right below the target frame, restores all callee
++// saved registers from the passed in context, sets R15 to that frame and sets the
++// return address to the target frame's PSW address.
++// Then it uses the ThrowExceptionHelper to throw the passed in exception from that context.
++// EXTERN_C void ThrowExceptionFromContextInternal(CONTEXT* context, PAL_SEHException* ex);
++LEAF_ENTRY ThrowExceptionFromContextInternal, _TEXT
++
++	// Restore all non volatile floating point registers
++	lfd %f15, CONTEXT_F15(%r3)
++	lfd %f16, CONTEXT_F16(%r3)
++	lfd %f17, CONTEXT_F17(%r3)
++	lfd %f18, CONTEXT_F18(%r3)
++	lfd %f19, CONTEXT_F19(%r3)
++	lfd %f20, CONTEXT_F20(%r3)
++	lfd %f21, CONTEXT_F21(%r3)
++	lfd %f22, CONTEXT_F22(%r3)
++	lfd %f23, CONTEXT_F23(%r3)
++	lfd %f24, CONTEXT_F24(%r3)
++	lfd %f25, CONTEXT_F25(%r3)
++	lfd %f26, CONTEXT_F26(%r3)
++	lfd %f27, CONTEXT_F27(%r3)
++	lfd %f28, CONTEXT_F28(%r3)
++	lfd %f29, CONTEXT_F29(%r3)
++	lfd %f30, CONTEXT_F30(%r3)
++	lfd %f31, CONTEXT_F31(%r3)
++
++	// Restore all non volatile general purpose registers
++	ld %r14, CONTEXT_R14(%r3)
++	ld %r15, CONTEXT_R15(%r3)
++	ld %r16, CONTEXT_R16(%r3)
++	ld %r17, CONTEXT_R17(%r3)
++	ld %r18, CONTEXT_R18(%r3)
++	ld %r19, CONTEXT_R19(%r3)
++	ld %r20, CONTEXT_R20(%r3)
++	ld %r21, CONTEXT_R21(%r3)
++	ld %r22, CONTEXT_R22(%r3)
++	ld %r23, CONTEXT_R23(%r3)
++	ld %r24, CONTEXT_R24(%r3)
++	ld %r25, CONTEXT_R25(%r3)
++	ld %r26, CONTEXT_R26(%r3)
++	ld %r27, CONTEXT_R27(%r3)
++	ld %r28, CONTEXT_R28(%r3)
++	ld %r29, CONTEXT_R29(%r3)
++	ld %r30, CONTEXT_R30(%r3)
++	ld %r31, CONTEXT_R31(%r3)
++
++	ld %r0, CONTEXT_NIP(%r3)
++	mtlr %r0
++
++	ld %r1, CONTEXT_R1(%r3)
++
++	// The PAL_SEHException pointer
++	mr     %r3, %r4
++	b      EXTERNAL_C_FUNC(ThrowExceptionHelper)
++LEAF_END ThrowExceptionFromContextInternal, _TEXT
+diff --git a/src/coreclr/pal/src/arch/ppc64/signalhandlerhelper.cpp b/src/coreclr/pal/src/arch/ppc64/signalhandlerhelper.cpp
+new file mode 100644
+index 00000000000..66615176a3a
+--- /dev/null
++++ b/src/coreclr/pal/src/arch/ppc64/signalhandlerhelper.cpp
+@@ -0,0 +1,68 @@
++// Licensed to the .NET Foundation under one or more agreements.
++// The .NET Foundation licenses this file to you under the MIT license.
++
++#include "pal/dbgmsg.h"
++SET_DEFAULT_DEBUG_CHANNEL(EXCEPT); // some headers have code with asserts, so do this first
++
++#include "pal/palinternal.h"
++#include "pal/context.h"
++#include "pal/signal.hpp"
++#include "pal/utils.h"
++#include <sys/ucontext.h>
++
++/*++
++Function :
++    ExecuteHandlerOnCustomStack
++
++    Execute signal handler on a custom stack, the current stack pointer is specified by the customSp
++    If the customSp is 0, then the handler is executed on the original stack where the signal was fired.
++    It installs a fake stack frame to enable stack unwinding to the signal source location.
++
++Parameters :
++    POSIX signal handler parameter list ("man sigaction" for details)
++    returnPoint - context to which the function returns if the common_signal_handler returns
++    
++    (no return value)
++--*/
++void ExecuteHandlerOnCustomStack(int code, siginfo_t *siginfo, void *context, size_t customSp, SignalHandlerWorkerReturnPoint* returnPoint)
++{
++	ucontext_t *ucontext = (ucontext_t *)context;
++    size_t faultSp = (size_t)MCREG_R1(ucontext->uc_mcontext);
++    _ASSERTE(IS_ALIGNED(faultSp, 8));
++
++    if (customSp == 0)
++    {
++        customSp = faultSp;
++    }
++
++    size_t fakeFrameReturnAddress;
++    if (IS_ALIGNED(faultSp, 16))
++    {
++        fakeFrameReturnAddress = (size_t)SignalHandlerWorkerReturnOffset0 + (size_t)CallSignalHandlerWrapper0;
++    }
++    else
++    {
++        fakeFrameReturnAddress = (size_t)SignalHandlerWorkerReturnOffset8 + (size_t)CallSignalHandlerWrapper8;
++    }
++
++    // Build fake stack frame to enable the stack unwinder to unwind from signal_handler_worker to the faulting instruction
++    size_t* saveArea = (size_t*)(customSp - 32);
++    saveArea[0] = faultSp;
++    saveArea[2] = (size_t)MCREG_Nip(ucontext->uc_mcontext);
++    size_t sp = customSp - 32;
++
++    // Switch the current context to the signal_handler_worker and the custom stack
++    CONTEXT context2;
++    RtlCaptureContext(&context2);
++
++    context2.Link = (size_t)signal_handler_worker;
++    context2.R0 = fakeFrameReturnAddress;
++    context2.R1 = sp;
++    context2.R3 = code;
++    context2.R4 = (size_t)siginfo;
++    context2.R5 = (size_t)context;
++    context2.R6 = (size_t)returnPoint;
++
++
++    RtlRestoreContext(&context2, NULL);
++}
+diff --git a/src/coreclr/pal/src/arch/ppc64le/asmconstants.h b/src/coreclr/pal/src/arch/ppc64le/asmconstants.h
+index 15ee945dafa..6917b86640b 100644
+--- a/src/coreclr/pal/src/arch/ppc64le/asmconstants.h
++++ b/src/coreclr/pal/src/arch/ppc64le/asmconstants.h
+@@ -1,8 +1,8 @@
+ // Licensed to the .NET Foundation under one or more agreements.
+ // The .NET Foundation licenses this file to you under the MIT license.
+ 
+-#ifndef __PAL_POWERPC_ASMCONSTANTS_H__
+-#define __PAL_POWERPC_ASMCONSTANTS_H__
++#ifndef __PAL_POWERPCLE_ASMCONSTANTS_H__
++#define __PAL_POWERPCLE_ASMCONSTANTS_H__
+ 
+ #define CONTEXT_PPC64   0x100000
+ 
+diff --git a/src/coreclr/pal/src/exception/remote-unwind.cpp b/src/coreclr/pal/src/exception/remote-unwind.cpp
+index 05cba618a10..cf65291a457 100644
+--- a/src/coreclr/pal/src/exception/remote-unwind.cpp
++++ b/src/coreclr/pal/src/exception/remote-unwind.cpp
+@@ -114,7 +114,7 @@ typedef BOOL(*UnwindReadMemoryCallback)(PVOID address, PVOID buffer, SIZE_T size
+ #define PRId PRId32
+ #define PRIA "08"
+ #define PRIxA PRIA PRIx
+-#elif defined(TARGET_AMD64) || defined(TARGET_ARM64) || defined(TARGET_S390X) || defined(TARGET_LOONGARCH64) || defined(TARGET_POWERPC64) || defined(TARGET_RISCV64)
++#elif defined(TARGET_AMD64) || defined(TARGET_ARM64) || defined(TARGET_S390X) || defined(TARGET_LOONGARCH64) || defined(TARGET_POWERPC64) || defined(TARGET_POWERPC64LE) || defined(TARGET_RISCV64)
+ #define PRIx PRIx64
+ #define PRIu PRIu64
+ #define PRId PRId64
+@@ -1866,7 +1866,7 @@ static void GetContextPointers(unw_cursor_t *cursor, unw_context_t *unwContext,
+     GetContextPointer(cursor, unwContext, UNW_S390X_R13, (SIZE_T **)&contextPointers->R13);
+     GetContextPointer(cursor, unwContext, UNW_S390X_R14, (SIZE_T **)&contextPointers->R14);
+     GetContextPointer(cursor, unwContext, UNW_S390X_R15, (SIZE_T **)&contextPointers->R15);
+-#elif defined(TARGET_POWERPC64)
++#elif defined(TARGET_POWERPC64) || defined(TARGET_POWERPC64LE)
+     GetContextPointer(cursor, unwContext, UNW_PPC64_R14, (SIZE_T **)&contextPointers->R14);
+     GetContextPointer(cursor, unwContext, UNW_PPC64_R15, (SIZE_T **)&contextPointers->R15);
+     GetContextPointer(cursor, unwContext, UNW_PPC64_R16, (SIZE_T **)&contextPointers->R16);
+@@ -1988,7 +1988,7 @@ static void UnwindContextToContext(unw_cursor_t *cursor, CONTEXT *winContext)
+     unw_get_reg(cursor, UNW_S390X_R13, (unw_word_t *) &winContext->R13);
+     unw_get_reg(cursor, UNW_S390X_R14, (unw_word_t *) &winContext->R14);
+     TRACE("sp %p pc %p lr %p\n", winContext->R15, winContext->PSWAddr, winContext->R14);
+-#elif defined(TARGET_POWERPC64)
++#elif defined(TARGET_POWERPC64) || defined(TARGET_POWERPC64LE)
+     //TODO
+     unw_get_reg(cursor, UNW_REG_IP, (unw_word_t *) &winContext->Nip);
+     unw_get_reg(cursor, UNW_REG_SP, (unw_word_t *) &winContext->R31);
+@@ -2143,7 +2143,7 @@ access_reg(unw_addr_space_t as, unw_regnum_t regnum, unw_word_t *valp, int write
+     case UNW_S390X_R14:    *valp = (unw_word_t)winContext->R14; break;
+     case UNW_S390X_R15:    *valp = (unw_word_t)winContext->R15; break;
+     case UNW_S390X_IP:     *valp = (unw_word_t)winContext->PSWAddr; break;
+-#elif defined(TARGET_POWERPC64)
++#elif defined(TARGET_POWERPC64) || defined(TARGET_POWERPC64LE)
+     //TODO
+     case UNW_PPC64_R14:    *valp = (unw_word_t)winContext->R14; break;
+     case UNW_PPC64_R15:    *valp = (unw_word_t)winContext->R15; break;
+diff --git a/src/coreclr/unwinder/ppc64/unwinder.cpp b/src/coreclr/unwinder/ppc64/unwinder.cpp
+new file mode 100644
+index 00000000000..b2674972672
+--- /dev/null
++++ b/src/coreclr/unwinder/ppc64/unwinder.cpp
+@@ -0,0 +1,4 @@
++// Licensed to the .NET Foundation under one or more agreements.
++// The .NET Foundation licenses this file to you under the MIT license.
++
++#error Unsupported platform
+diff --git a/src/coreclr/vm/ppc64/unixstubs.cpp b/src/coreclr/vm/ppc64/unixstubs.cpp
+new file mode 100644
+index 00000000000..d51902a949f
+--- /dev/null
++++ b/src/coreclr/vm/ppc64/unixstubs.cpp
+@@ -0,0 +1,12 @@
++// Licensed to the .NET Foundation under one or more agreements.
++// The .NET Foundation licenses this file to you under the MIT license.
++
++#include "common.h"
++
++extern "C"
++{
++    void RedirectForThrowControl()
++    {
++        PORTABILITY_ASSERT("Implement for PAL");
++    }
++};
+diff --git a/src/installer/pkg/projects/netcoreappRIDs.props b/src/installer/pkg/projects/netcoreappRIDs.props
+index 6c84841697b..a9ce403bb97 100644
+--- a/src/installer/pkg/projects/netcoreappRIDs.props
++++ b/src/installer/pkg/projects/netcoreappRIDs.props
+@@ -63,6 +63,9 @@
+     <UnofficialBuildRID Include="linux-musl-s390x">
+       <Platform>s390x</Platform>
+     </UnofficialBuildRID>
++    <UnofficialBuildRID Include="linux-ppc64">
++      <Platform>ppc64</Platform>
++    </UnofficialBuildRID>
+     <UnofficialBuildRID Include="linux-ppc64le">
+       <Platform>ppc64le</Platform>
+     </UnofficialBuildRID>
+diff --git a/src/libraries/Common/tests/TestUtilities/System/PlatformDetection.cs b/src/libraries/Common/tests/TestUtilities/System/PlatformDetection.cs
+index 67cde84c483..15009eab3b9 100644
+--- a/src/libraries/Common/tests/TestUtilities/System/PlatformDetection.cs
++++ b/src/libraries/Common/tests/TestUtilities/System/PlatformDetection.cs
+@@ -68,6 +68,7 @@ public static partial class PlatformDetection
+         public static bool IsArmv6Process => (int)RuntimeInformation.ProcessArchitecture == 7; // Architecture.Armv6
+         public static bool IsPpc64leProcess => (int)RuntimeInformation.ProcessArchitecture == 8; // Architecture.Ppc64le
+         public static bool IsRiscV64Process => (int)RuntimeInformation.ProcessArchitecture == 9; // Architecture.RiscV64;
++        public static bool IsPpc64Process => (int)RuntimeInformation.ProcessArchitecture == 10; // Architecture.Ppc64
+         public static bool IsX64Process => RuntimeInformation.ProcessArchitecture == Architecture.X64;
+         public static bool IsX86Process => RuntimeInformation.ProcessArchitecture == Architecture.X86;
+         public static bool IsNotX86Process => !IsX86Process;
+diff --git a/src/libraries/Microsoft.NETCore.Platforms/src/runtime.json b/src/libraries/Microsoft.NETCore.Platforms/src/runtime.json
+index 64e7c5546b5..b7a2f90e62f 100644
+--- a/src/libraries/Microsoft.NETCore.Platforms/src/runtime.json
++++ b/src/libraries/Microsoft.NETCore.Platforms/src/runtime.json
+@@ -2159,6 +2159,12 @@
+         "linux-x86"
+       ]
+     },
++    "linux-ppc64": {
++      "#import": [
++        "linux",
++        "unix-ppc64"
++      ]
++    },
+     "linux-ppc64le": {
+       "#import": [
+         "linux",
+@@ -4267,6 +4273,11 @@
+         "unix"
+       ]
+     },
++    "unix-ppc64": {
++      "#import": [
++        "unix"
++      ]
++    },
+     "unix-ppc64le": {
+       "#import": [
+         "unix"
+diff --git a/src/libraries/System.Diagnostics.Process/tests/ProcessThreadTests.Unix.cs b/src/libraries/System.Diagnostics.Process/tests/ProcessThreadTests.Unix.cs
+index d7ce1abcdb5..67eca72dd34 100644
+--- a/src/libraries/System.Diagnostics.Process/tests/ProcessThreadTests.Unix.cs
++++ b/src/libraries/System.Diagnostics.Process/tests/ProcessThreadTests.Unix.cs
+@@ -42,6 +42,7 @@ private static int GetCurrentThreadId()
+                 Architecture.X86 => 224,
+                 Architecture.X64 => 186,
+                 Architecture.S390x => 236,
++                Architecture.Ppc64 => 207,
+                 Architecture.Ppc64le => 207,
+                 Architecture.RiscV64 => 178,
+                 _ => 178,
+diff --git a/src/libraries/System.Private.CoreLib/src/System.Private.CoreLib.Shared.projitems b/src/libraries/System.Private.CoreLib/src/System.Private.CoreLib.Shared.projitems
+index 412fb8ba8b8..fda9490c244 100644
+--- a/src/libraries/System.Private.CoreLib/src/System.Private.CoreLib.Shared.projitems
++++ b/src/libraries/System.Private.CoreLib/src/System.Private.CoreLib.Shared.projitems
+@@ -20,7 +20,7 @@
+     <SupportsX86Intrinsics Condition="'$(Platform)' == 'x86' and '$(TargetsWindows)' == 'true' and '$(FeatureMono)' == 'true'">false</SupportsX86Intrinsics>
+     <ILLinkSharedDirectory>$(MSBuildThisFileDirectory)ILLink\</ILLinkSharedDirectory>
+     <IsBigEndian Condition="'$(Platform)' == 's390x'">true</IsBigEndian>
+-    <Is64Bit Condition="'$(Platform)' == 'arm64' or '$(Platform)' == 'x64' or '$(Platform)' == 's390x' or '$(Platform)' == 'loongarch64' or '$(Platform)' == 'ppc64le' or '$(Platform)' == 'riscv64'">true</Is64Bit>
++    <Is64Bit Condition="'$(Platform)' == 'arm64' or '$(Platform)' == 'x64' or '$(Platform)' == 's390x' or '$(Platform)' == 'loongarch64' or '$(Platform)' == 'ppc64' or '$(Platform)' == 'ppc64le' or '$(Platform)' == 'riscv64'">true</Is64Bit>
+     <UseMinimalGlobalizationData Condition="'$(TargetsBrowser)' == 'true' or '$(TargetsWasi)' == 'true'">true</UseMinimalGlobalizationData>
+   </PropertyGroup>
+   <PropertyGroup>
+@@ -2808,4 +2808,4 @@
+     <Compile Include="$(MSBuildThisFileDirectory)System\Threading\Wasi\WasiPollWorld.wit.imports.wasi.io.v0_2_1.IPoll.cs" />
+     <Compile Include="$(MSBuildThisFileDirectory)System\Threading\Wasi\WasiPollWorld.wit.imports.wasi.io.v0_2_1.PollInterop.cs" />
+   </ItemGroup>
+-</Project>
+\ No newline at end of file
++</Project>
+diff --git a/src/libraries/System.Private.CoreLib/src/System/Runtime/InteropServices/Architecture.cs b/src/libraries/System.Private.CoreLib/src/System/Runtime/InteropServices/Architecture.cs
+index 2e1c3c5a4eb..96fd7577f2c 100644
+--- a/src/libraries/System.Private.CoreLib/src/System/Runtime/InteropServices/Architecture.cs
++++ b/src/libraries/System.Private.CoreLib/src/System/Runtime/InteropServices/Architecture.cs
+@@ -57,5 +57,9 @@ public enum Architecture
+         /// This value indicates RV64GC set of extensions.
+         /// </remarks>
+         RiscV64,
++        /// <summary>
++        /// A PowerPC 64-bit (big-endian) processor architecture.
++        /// </summary>
++        Ppc64,
+     }
+ }
+diff --git a/src/libraries/System.Private.CoreLib/src/System/Runtime/InteropServices/RuntimeInformation.cs b/src/libraries/System.Private.CoreLib/src/System/Runtime/InteropServices/RuntimeInformation.cs
+index 9387967c49a..4a8c436518a 100644
+--- a/src/libraries/System.Private.CoreLib/src/System/Runtime/InteropServices/RuntimeInformation.cs
++++ b/src/libraries/System.Private.CoreLib/src/System/Runtime/InteropServices/RuntimeInformation.cs
+@@ -43,6 +43,8 @@ public static Architecture ProcessArchitecture
+ #elif TARGET_LOONGARCH64
+             => Architecture.LoongArch64
+ #elif TARGET_POWERPC64
++            => Architecture.Ppc64
++#elif TARGET_POWERPC64LE
+             => Architecture.Ppc64le
+ #elif TARGET_RISCV64
+             => Architecture.RiscV64
+diff --git a/src/libraries/System.Runtime/ref/System.Runtime.cs b/src/libraries/System.Runtime/ref/System.Runtime.cs
+index 1218e562936..dfdf87bac4f 100644
+--- a/src/libraries/System.Runtime/ref/System.Runtime.cs
++++ b/src/libraries/System.Runtime/ref/System.Runtime.cs
+@@ -13948,6 +13948,7 @@ public enum Architecture
+         Armv6 = 7,
+         Ppc64le = 8,
+         RiscV64 = 9,
++        Ppc64 = 10,
+     }
+     public enum CharSet
+     {
+diff --git a/src/libraries/System.Runtime/tests/System.Runtime.InteropServices.RuntimeInformation.Tests/CheckArchitectureTests.cs b/src/libraries/System.Runtime/tests/System.Runtime.InteropServices.RuntimeInformation.Tests/CheckArchitectureTests.cs
+index 3519b425bb4..90b73f3f3af 100644
+--- a/src/libraries/System.Runtime/tests/System.Runtime.InteropServices.RuntimeInformation.Tests/CheckArchitectureTests.cs
++++ b/src/libraries/System.Runtime/tests/System.Runtime.InteropServices.RuntimeInformation.Tests/CheckArchitectureTests.cs
+@@ -55,6 +55,10 @@ public void VerifyArchitecture()
+                 case Architecture.Armv6:
+                     Assert.Equal(Architecture.Armv6, processArch);
+                     break;
++                
++                case Architecture.Ppc64:
++                    Assert.Equal(Architecture.Ppc64, processArch);
++                    break;
+ 
+                 case Architecture.Ppc64le:
+                     Assert.Equal(Architecture.Ppc64le, processArch);
+diff --git a/src/libraries/tests.proj b/src/libraries/tests.proj
+index 16c8f16d419..2cfd1e22308 100644
+--- a/src/libraries/tests.proj
++++ b/src/libraries/tests.proj
+@@ -146,6 +146,17 @@
+     <ProjectExclusions Include="$(MSBuildThisFileDirectory)System.Runtime.InteropServices.JavaScript\tests\JSImportGenerator.UnitTest\JSImportGenerator.Unit.Tests.csproj" />
+   </ItemGroup>
+ 
++  <ItemGroup Condition="'$(TargetOS)' == 'linux' and '$(TargetArchitecture)' == 'ppc64'">
++    <!-- LibraryImportGenerator runtime tests build depends pulling down a pre-built nethost binary, which is not available for ppc64. -->
++    <ProjectExclusions Include="$(MSBuildThisFileDirectory)System.Runtime.InteropServices\tests\LibraryImportGenerator.Tests\LibraryImportGenerator.Tests.csproj" />
++    <ProjectExclusions Include="$(MSBuildThisFileDirectory)System.Runtime.InteropServices\tests\ComInterfaceGenerator.Tests\ComInterfaceGenerator.Tests.csproj" />
++    <ProjectExclusions Include="$(MSBuildThisFileDirectory)System.Runtime.InteropServices\tests\ComInterfaceGenerator.Unit.Tests\ComInterfaceGenerator.Unit.Tests.csproj" />
++    <ProjectExclusions Include="$(MSBuildThisFileDirectory)System.Runtime.InteropServices.JavaScript\tests\JSImportGenerator.UnitTest\JSImportGenerator.Unit.Tests.csproj" />
++
++    <!-- Issue: https://github.com/dotnet/runtime/issues/97296 -->
++    <ProjectExclusions Include="$(MSBuildThisFileDirectory)System.Runtime.Intrinsics\tests\System.Runtime.Intrinsics.Tests.csproj" />
++  </ItemGroup>
++
+   <ItemGroup Condition="'$(TargetOS)' == 'linux' and '$(TargetArchitecture)' == 'ppc64le'">
+     <!-- LibraryImportGenerator runtime tests build depends pulling down a pre-built nethost binary, which is not available for ppc64le. -->
+     <ProjectExclusions Include="$(MSBuildThisFileDirectory)System.Runtime.InteropServices\tests\LibraryImportGenerator.Tests\LibraryImportGenerator.Tests.csproj" />
+diff --git a/src/mono/CMakeLists.txt b/src/mono/CMakeLists.txt
+index fabeafa41e3..834c70570ff 100644
+--- a/src/mono/CMakeLists.txt
++++ b/src/mono/CMakeLists.txt
+@@ -412,6 +412,9 @@ elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "s390x")
+   set(HOST_S390X 1)
+ elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "wasm" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "wasm32")
+   set(HOST_WASM 1)
++elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "ppc64")
++  set(HOST_POWERPC 1)
++  set(HOST_POWERPC64 1)
+ elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "ppc64le")
+   set(HOST_POWERPC 1)
+   set(HOST_POWERPC64 1)
+@@ -493,6 +496,12 @@ elseif(TARGET_ARCH STREQUAL "wasm" OR TARGET_ARCH STREQUAL "wasm32")
+   set(MONO_ARCHITECTURE "\"wasm\"")
+   set(TARGET_SIZEOF_VOID_P 4)
+   set(SIZEOF_REGISTER 4)
++  elseif(TARGET_ARCH STREQUAL "ppc64")
++  set(TARGET_POWERPC 1)
++  set(TARGET_POWERPC64 1)
++  set(MONO_ARCHITECTURE "\"ppc64\"")
++  set(TARGET_SIZEOF_VOID_P 8)
++  set(SIZEOF_REGISTER 8)
+ elseif(TARGET_ARCH STREQUAL "ppc64le")
+   set(TARGET_POWERPC 1)
+   set(TARGET_POWERPC64 1)
+diff --git a/src/mono/System.Private.CoreLib/System.Private.CoreLib.csproj b/src/mono/System.Private.CoreLib/System.Private.CoreLib.csproj
+index d7983bef487..c7ca1258bf0 100644
+--- a/src/mono/System.Private.CoreLib/System.Private.CoreLib.csproj
++++ b/src/mono/System.Private.CoreLib/System.Private.CoreLib.csproj
+@@ -10,7 +10,7 @@
+     <!-- Force System.Private.CoreLib.dll into a special IL output directory -->
+     <OutputPath>$(RuntimeBinDir)IL/</OutputPath>
+     <Configurations>Debug;Release;Checked</Configurations>
+-    <Platforms>x64;x86;arm;armv6;arm64;riscv64;s390x;wasm;ppc64le</Platforms>
++    <Platforms>x64;x86;arm;armv6;arm64;riscv64;s390x;wasm;ppc64;ppc64le</Platforms>
+ 
+     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+   </PropertyGroup>
+@@ -69,6 +69,9 @@
+   <PropertyGroup Condition="'$(Platform)' == 'wasm'">
+     <DefineConstants>$(DefineConstants);TARGET_WASM</DefineConstants>
+   </PropertyGroup>
++  <PropertyGroup Condition="'$(Platform)' == 'ppc64'">
++    <DefineConstants>$(DefineConstants);TARGET_POWERPC64</DefineConstants>
++  </PropertyGroup>
+   <PropertyGroup Condition="'$(Platform)' == 'ppc64le'">
+     <DefineConstants>$(DefineConstants);TARGET_POWERPC64</DefineConstants>
+   </PropertyGroup>
+diff --git a/src/mono/System.Private.CoreLib/System.Private.CoreLib.sln b/src/mono/System.Private.CoreLib/System.Private.CoreLib.sln
+index 0b525b7c00d..153728c9f2b 100644
+--- a/src/mono/System.Private.CoreLib/System.Private.CoreLib.sln
++++ b/src/mono/System.Private.CoreLib/System.Private.CoreLib.sln
+@@ -49,6 +49,7 @@ Global
+ 		Checked|arm = Checked|arm
+ 		Checked|arm64 = Checked|arm64
+ 		Checked|armv6 = Checked|armv6
++		Checked|ppc64 = Checked|ppc64
+ 		Checked|ppc64le = Checked|ppc64le
+ 		Checked|riscv64 = Checked|riscv64
+ 		Checked|s390x = Checked|s390x
+@@ -61,6 +62,7 @@ Global
+ 		Debug|arm = Debug|arm
+ 		Debug|arm64 = Debug|arm64
+ 		Debug|armv6 = Debug|armv6
++		Debug|ppc64 = Debug|ppc64
+ 		Debug|ppc64le = Debug|ppc64le
+ 		Debug|riscv64 = Debug|riscv64
+ 		Debug|s390x = Debug|s390x
+@@ -73,6 +75,7 @@ Global
+ 		Release|arm = Release|arm
+ 		Release|arm64 = Release|arm64
+ 		Release|armv6 = Release|armv6
++		Release|ppc64 = Release|ppc64
+ 		Release|ppc64le = Release|ppc64le
+ 		Release|riscv64 = Release|riscv64
+ 		Release|s390x = Release|s390x
+@@ -91,6 +94,8 @@ Global
+ 		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Checked|arm64.Build.0 = Checked|arm64
+ 		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Checked|armv6.ActiveCfg = Checked|armv6
+ 		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Checked|armv6.Build.0 = Checked|armv6
++		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Checked|ppc64.ActiveCfg = Checked|ppc64
++		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Checked|ppc64.Build.0 = Checked|ppc64
+ 		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Checked|ppc64le.ActiveCfg = Checked|ppc64le
+ 		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Checked|ppc64le.Build.0 = Checked|ppc64le
+ 		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Checked|riscv64.ActiveCfg = Checked|riscv64
+@@ -113,6 +118,8 @@ Global
+ 		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Debug|arm64.Build.0 = Debug|arm64
+ 		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Debug|armv6.ActiveCfg = Debug|armv6
+ 		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Debug|armv6.Build.0 = Debug|armv6
++		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Debug|ppc64.ActiveCfg = Debug|ppc64
++		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Debug|ppc64.Build.0 = Debug|ppc64
+ 		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Debug|ppc64le.ActiveCfg = Debug|ppc64le
+ 		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Debug|ppc64le.Build.0 = Debug|ppc64le
+ 		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Debug|riscv64.ActiveCfg = Debug|riscv64
+@@ -135,6 +142,8 @@ Global
+ 		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Release|arm64.Build.0 = Release|arm64
+ 		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Release|armv6.ActiveCfg = Release|armv6
+ 		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Release|armv6.Build.0 = Release|armv6
++		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Release|ppc64.ActiveCfg = Release|ppc64
++		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Release|ppc64.Build.0 = Release|ppc64
+ 		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Release|ppc64le.ActiveCfg = Release|ppc64le
+ 		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Release|ppc64le.Build.0 = Release|ppc64le
+ 		{8FBEB036-6F52-464C-8BC9-B0B5F18262A6}.Release|riscv64.ActiveCfg = Release|riscv64
+@@ -158,6 +167,8 @@ Global
+ 		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Checked|arm64.Build.0 = Debug|Any CPU
+ 		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Checked|armv6.ActiveCfg = Release|Any CPU
+ 		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Checked|armv6.Build.0 = Release|Any CPU
++		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Checked|ppc64.ActiveCfg = Release|Any CPU
++		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Checked|ppc64.Build.0 = Release|Any CPU
+ 		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Checked|ppc64le.ActiveCfg = Release|Any CPU
+ 		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Checked|ppc64le.Build.0 = Release|Any CPU
+ 		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Checked|riscv64.ActiveCfg = Release|Any CPU
+@@ -182,6 +193,8 @@ Global
+ 		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Debug|arm64.Build.0 = Debug|Any CPU
+ 		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Debug|armv6.ActiveCfg = Debug|Any CPU
+ 		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Debug|armv6.Build.0 = Debug|Any CPU
++		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Debug|ppc64.ActiveCfg = Debug|Any CPU
++		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Debug|ppc64.Build.0 = Debug|Any CPU
+ 		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Debug|ppc64le.ActiveCfg = Debug|Any CPU
+ 		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Debug|ppc64le.Build.0 = Debug|Any CPU
+ 		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Debug|riscv64.ActiveCfg = Debug|Any CPU
+@@ -206,6 +219,8 @@ Global
+ 		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Release|arm64.Build.0 = Release|Any CPU
+ 		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Release|armv6.ActiveCfg = Release|Any CPU
+ 		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Release|armv6.Build.0 = Release|Any CPU
++		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Release|ppc64.ActiveCfg = Release|Any CPU
++		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Release|ppc64.Build.0 = Release|Any CPU
+ 		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Release|ppc64le.ActiveCfg = Release|Any CPU
+ 		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Release|ppc64le.Build.0 = Release|Any CPU
+ 		{A4CD9C83-5937-46B7-A1F2-1990F5B938E7}.Release|riscv64.ActiveCfg = Release|Any CPU
+@@ -230,6 +245,8 @@ Global
+ 		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Checked|arm64.Build.0 = Debug|Any CPU
+ 		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Checked|armv6.ActiveCfg = Debug|Any CPU
+ 		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Checked|armv6.Build.0 = Debug|Any CPU
++		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Checked|ppc64.ActiveCfg = Debug|Any CPU
++		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Checked|ppc64.Build.0 = Debug|Any CPU
+ 		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Checked|ppc64le.ActiveCfg = Debug|Any CPU
+ 		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Checked|ppc64le.Build.0 = Debug|Any CPU
+ 		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Checked|riscv64.ActiveCfg = Debug|Any CPU
+@@ -254,6 +271,8 @@ Global
+ 		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Debug|arm64.Build.0 = Debug|Any CPU
+ 		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Debug|armv6.ActiveCfg = Debug|Any CPU
+ 		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Debug|armv6.Build.0 = Debug|Any CPU
++		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Debug|ppc64.ActiveCfg = Debug|Any CPU
++		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Debug|ppc64.Build.0 = Debug|Any CPU
+ 		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Debug|ppc64le.ActiveCfg = Debug|Any CPU
+ 		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Debug|ppc64le.Build.0 = Debug|Any CPU
+ 		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Debug|riscv64.ActiveCfg = Debug|Any CPU
+@@ -278,6 +297,8 @@ Global
+ 		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Release|arm64.Build.0 = Release|Any CPU
+ 		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Release|armv6.ActiveCfg = Release|Any CPU
+ 		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Release|armv6.Build.0 = Release|Any CPU
++		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Release|ppc64.ActiveCfg = Release|Any CPU
++		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Release|ppc64.Build.0 = Release|Any CPU
+ 		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Release|ppc64le.ActiveCfg = Release|Any CPU
+ 		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Release|ppc64le.Build.0 = Release|Any CPU
+ 		{663D1F21-B4B4-4BDF-A95F-69933D072036}.Release|riscv64.ActiveCfg = Release|Any CPU
+@@ -302,6 +323,8 @@ Global
+ 		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Checked|arm64.Build.0 = Debug|Any CPU
+ 		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Checked|armv6.ActiveCfg = Debug|Any CPU
+ 		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Checked|armv6.Build.0 = Debug|Any CPU
++		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Checked|ppc64.ActiveCfg = Debug|Any CPU
++		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Checked|ppc64.Build.0 = Debug|Any CPU
+ 		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Checked|ppc64le.ActiveCfg = Debug|Any CPU
+ 		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Checked|ppc64le.Build.0 = Debug|Any CPU
+ 		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Checked|riscv64.ActiveCfg = Debug|Any CPU
+@@ -326,6 +349,8 @@ Global
+ 		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Debug|arm64.Build.0 = Debug|Any CPU
+ 		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Debug|armv6.ActiveCfg = Debug|Any CPU
+ 		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Debug|armv6.Build.0 = Debug|Any CPU
++		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Debug|ppc64.ActiveCfg = Debug|Any CPU
++		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Debug|ppc64.Build.0 = Debug|Any CPU
+ 		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Debug|ppc64le.ActiveCfg = Debug|Any CPU
+ 		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Debug|ppc64le.Build.0 = Debug|Any CPU
+ 		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Debug|riscv64.ActiveCfg = Debug|Any CPU
+@@ -350,6 +375,8 @@ Global
+ 		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Release|arm64.Build.0 = Release|Any CPU
+ 		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Release|armv6.ActiveCfg = Release|Any CPU
+ 		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Release|armv6.Build.0 = Release|Any CPU
++		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Release|ppc64.ActiveCfg = Release|Any CPU
++		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Release|ppc64.Build.0 = Release|Any CPU
+ 		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Release|ppc64le.ActiveCfg = Release|Any CPU
+ 		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Release|ppc64le.Build.0 = Release|Any CPU
+ 		{69B56E13-3BAB-4F0E-9DD2-DC805244BA42}.Release|riscv64.ActiveCfg = Release|Any CPU
+@@ -374,6 +401,8 @@ Global
+ 		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Checked|arm64.Build.0 = Debug|Any CPU
+ 		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Checked|armv6.ActiveCfg = Debug|Any CPU
+ 		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Checked|armv6.Build.0 = Debug|Any CPU
++		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Checked|ppc64.ActiveCfg = Debug|Any CPU
++		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Checked|ppc64.Build.0 = Debug|Any CPU
+ 		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Checked|ppc64le.ActiveCfg = Debug|Any CPU
+ 		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Checked|ppc64le.Build.0 = Debug|Any CPU
+ 		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Checked|riscv64.ActiveCfg = Debug|Any CPU
+@@ -398,6 +427,8 @@ Global
+ 		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Debug|arm64.Build.0 = Debug|Any CPU
+ 		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Debug|armv6.ActiveCfg = Debug|Any CPU
+ 		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Debug|armv6.Build.0 = Debug|Any CPU
++		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Debug|ppc64.ActiveCfg = Debug|Any CPU
++		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Debug|ppc64.Build.0 = Debug|Any CPU
+ 		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Debug|ppc64le.ActiveCfg = Debug|Any CPU
+ 		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Debug|ppc64le.Build.0 = Debug|Any CPU
+ 		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Debug|riscv64.ActiveCfg = Debug|Any CPU
+@@ -422,6 +453,8 @@ Global
+ 		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Release|arm64.Build.0 = Release|Any CPU
+ 		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Release|armv6.ActiveCfg = Release|Any CPU
+ 		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Release|armv6.Build.0 = Release|Any CPU
++		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Release|ppc64.ActiveCfg = Release|Any CPU
++		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Release|ppc64.Build.0 = Release|Any CPU
+ 		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Release|ppc64le.ActiveCfg = Release|Any CPU
+ 		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Release|ppc64le.Build.0 = Release|Any CPU
+ 		{1AAF4103-8688-4ABF-B347-EE60E35109BD}.Release|riscv64.ActiveCfg = Release|Any CPU
+@@ -446,6 +479,8 @@ Global
+ 		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Checked|arm64.Build.0 = Debug|Any CPU
+ 		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Checked|armv6.ActiveCfg = Debug|Any CPU
+ 		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Checked|armv6.Build.0 = Debug|Any CPU
++		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Checked|ppc64.ActiveCfg = Debug|Any CPU
++		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Checked|ppc64.Build.0 = Debug|Any CPU
+ 		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Checked|ppc64le.ActiveCfg = Debug|Any CPU
+ 		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Checked|ppc64le.Build.0 = Debug|Any CPU
+ 		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Checked|riscv64.ActiveCfg = Debug|Any CPU
+@@ -470,6 +505,8 @@ Global
+ 		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Debug|arm64.Build.0 = Debug|Any CPU
+ 		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Debug|armv6.ActiveCfg = Debug|Any CPU
+ 		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Debug|armv6.Build.0 = Debug|Any CPU
++		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Debug|ppc64.ActiveCfg = Debug|Any CPU
++		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Debug|ppc64.Build.0 = Debug|Any CPU
+ 		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Debug|ppc64le.ActiveCfg = Debug|Any CPU
+ 		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Debug|ppc64le.Build.0 = Debug|Any CPU
+ 		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Debug|riscv64.ActiveCfg = Debug|Any CPU
+@@ -494,6 +531,8 @@ Global
+ 		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Release|arm64.Build.0 = Release|Any CPU
+ 		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Release|armv6.ActiveCfg = Release|Any CPU
+ 		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Release|armv6.Build.0 = Release|Any CPU
++		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Release|ppc64.ActiveCfg = Release|Any CPU
++		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Release|ppc64.Build.0 = Release|Any CPU
+ 		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Release|ppc64le.ActiveCfg = Release|Any CPU
+ 		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Release|ppc64le.Build.0 = Release|Any CPU
+ 		{9C2717EE-3D47-4F89-97D5-0873FFE0B987}.Release|riscv64.ActiveCfg = Release|Any CPU
+@@ -518,6 +557,8 @@ Global
+ 		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Checked|arm64.Build.0 = Debug|Any CPU
+ 		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Checked|armv6.ActiveCfg = Debug|Any CPU
+ 		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Checked|armv6.Build.0 = Debug|Any CPU
++		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Checked|ppc64.ActiveCfg = Debug|Any CPU
++		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Checked|ppc64.Build.0 = Debug|Any CPU
+ 		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Checked|ppc64le.ActiveCfg = Debug|Any CPU
+ 		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Checked|ppc64le.Build.0 = Debug|Any CPU
+ 		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Checked|riscv64.ActiveCfg = Debug|Any CPU
+@@ -542,6 +583,8 @@ Global
+ 		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Debug|arm64.Build.0 = Debug|Any CPU
+ 		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Debug|armv6.ActiveCfg = Debug|Any CPU
+ 		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Debug|armv6.Build.0 = Debug|Any CPU
++		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Debug|ppc64.ActiveCfg = Debug|Any CPU
++		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Debug|ppc64.Build.0 = Debug|Any CPU
+ 		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Debug|ppc64le.ActiveCfg = Debug|Any CPU
+ 		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Debug|ppc64le.Build.0 = Debug|Any CPU
+ 		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Debug|riscv64.ActiveCfg = Debug|Any CPU
+@@ -566,6 +609,8 @@ Global
+ 		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Release|arm64.Build.0 = Release|Any CPU
+ 		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Release|armv6.ActiveCfg = Release|Any CPU
+ 		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Release|armv6.Build.0 = Release|Any CPU
++		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Release|ppc64.ActiveCfg = Release|Any CPU
++		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Release|ppc64.Build.0 = Release|Any CPU
+ 		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Release|ppc64le.ActiveCfg = Release|Any CPU
+ 		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Release|ppc64le.Build.0 = Release|Any CPU
+ 		{650A6AE8-0B76-453B-A785-F3DD0458A3BC}.Release|riscv64.ActiveCfg = Release|Any CPU
+@@ -590,6 +635,8 @@ Global
+ 		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Checked|arm64.Build.0 = Debug|Any CPU
+ 		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Checked|armv6.ActiveCfg = Debug|Any CPU
+ 		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Checked|armv6.Build.0 = Debug|Any CPU
++		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Checked|ppc64.ActiveCfg = Debug|Any CPU
++		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Checked|ppc64.Build.0 = Debug|Any CPU
+ 		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Checked|ppc64le.ActiveCfg = Debug|Any CPU
+ 		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Checked|ppc64le.Build.0 = Debug|Any CPU
+ 		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Checked|riscv64.ActiveCfg = Debug|Any CPU
+@@ -614,6 +661,8 @@ Global
+ 		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Debug|arm64.Build.0 = Debug|Any CPU
+ 		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Debug|armv6.ActiveCfg = Debug|Any CPU
+ 		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Debug|armv6.Build.0 = Debug|Any CPU
++		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Debug|ppc64.ActiveCfg = Debug|Any CPU
++		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Debug|ppc64.Build.0 = Debug|Any CPU
+ 		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Debug|ppc64le.ActiveCfg = Debug|Any CPU
+ 		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Debug|ppc64le.Build.0 = Debug|Any CPU
+ 		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Debug|riscv64.ActiveCfg = Debug|Any CPU
+@@ -638,6 +687,8 @@ Global
+ 		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Release|arm64.Build.0 = Release|Any CPU
+ 		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Release|armv6.ActiveCfg = Release|Any CPU
+ 		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Release|armv6.Build.0 = Release|Any CPU
++		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Release|ppc64.ActiveCfg = Release|Any CPU
++		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Release|ppc64.Build.0 = Release|Any CPU
+ 		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Release|ppc64le.ActiveCfg = Release|Any CPU
+ 		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Release|ppc64le.Build.0 = Release|Any CPU
+ 		{5F4290E3-9282-43F4-8A2E-EEA7665CC208}.Release|riscv64.ActiveCfg = Release|Any CPU
+@@ -662,6 +713,8 @@ Global
+ 		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Checked|arm64.Build.0 = Debug|Any CPU
+ 		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Checked|armv6.ActiveCfg = Debug|Any CPU
+ 		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Checked|armv6.Build.0 = Debug|Any CPU
++		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Checked|ppc64.ActiveCfg = Debug|Any CPU
++		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Checked|ppc64.Build.0 = Debug|Any CPU
+ 		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Checked|ppc64le.ActiveCfg = Debug|Any CPU
+ 		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Checked|ppc64le.Build.0 = Debug|Any CPU
+ 		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Checked|riscv64.ActiveCfg = Debug|Any CPU
+@@ -686,6 +739,8 @@ Global
+ 		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Debug|arm64.Build.0 = Debug|Any CPU
+ 		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Debug|armv6.ActiveCfg = Debug|Any CPU
+ 		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Debug|armv6.Build.0 = Debug|Any CPU
++		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Debug|ppc64.ActiveCfg = Debug|Any CPU
++		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Debug|ppc64.Build.0 = Debug|Any CPU
+ 		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Debug|ppc64le.ActiveCfg = Debug|Any CPU
+ 		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Debug|ppc64le.Build.0 = Debug|Any CPU
+ 		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Debug|riscv64.ActiveCfg = Debug|Any CPU
+@@ -710,6 +765,8 @@ Global
+ 		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Release|arm64.Build.0 = Release|Any CPU
+ 		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Release|armv6.ActiveCfg = Release|Any CPU
+ 		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Release|armv6.Build.0 = Release|Any CPU
++		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Release|ppc64.ActiveCfg = Release|Any CPU
++		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Release|ppc64.Build.0 = Release|Any CPU
+ 		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Release|ppc64le.ActiveCfg = Release|Any CPU
+ 		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Release|ppc64le.Build.0 = Release|Any CPU
+ 		{648B364B-C1F1-44BC-B22B-288DA0898DCA}.Release|riscv64.ActiveCfg = Release|Any CPU
+@@ -734,6 +791,8 @@ Global
+ 		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Checked|arm64.Build.0 = Debug|Any CPU
+ 		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Checked|armv6.ActiveCfg = Debug|Any CPU
+ 		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Checked|armv6.Build.0 = Debug|Any CPU
++		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Checked|ppc64.ActiveCfg = Debug|Any CPU
++		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Checked|ppc64.Build.0 = Debug|Any CPU
+ 		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Checked|ppc64le.ActiveCfg = Debug|Any CPU
+ 		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Checked|ppc64le.Build.0 = Debug|Any CPU
+ 		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Checked|riscv64.ActiveCfg = Debug|Any CPU
+@@ -758,6 +817,8 @@ Global
+ 		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Debug|arm64.Build.0 = Debug|Any CPU
+ 		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Debug|armv6.ActiveCfg = Debug|Any CPU
+ 		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Debug|armv6.Build.0 = Debug|Any CPU
++		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Debug|ppc64.ActiveCfg = Debug|Any CPU
++		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Debug|ppc64.Build.0 = Debug|Any CPU
+ 		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Debug|ppc64le.ActiveCfg = Debug|Any CPU
+ 		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Debug|ppc64le.Build.0 = Debug|Any CPU
+ 		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Debug|riscv64.ActiveCfg = Debug|Any CPU
+@@ -782,6 +843,8 @@ Global
+ 		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Release|arm64.Build.0 = Release|Any CPU
+ 		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Release|armv6.ActiveCfg = Release|Any CPU
+ 		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Release|armv6.Build.0 = Release|Any CPU
++		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Release|ppc64.ActiveCfg = Release|Any CPU
++		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Release|ppc64.Build.0 = Release|Any CPU
+ 		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Release|ppc64le.ActiveCfg = Release|Any CPU
+ 		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Release|ppc64le.Build.0 = Release|Any CPU
+ 		{98B8A25B-AF88-4920-92B4-669C798F7A38}.Release|riscv64.ActiveCfg = Release|Any CPU
+@@ -806,6 +869,8 @@ Global
+ 		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Checked|arm64.Build.0 = Checked|x64
+ 		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Checked|armv6.ActiveCfg = Checked|x64
+ 		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Checked|armv6.Build.0 = Checked|x64
++		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Checked|ppc64.ActiveCfg = Checked|x64
++		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Checked|ppc64.Build.0 = Checked|x64
+ 		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Checked|ppc64le.ActiveCfg = Checked|x64
+ 		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Checked|ppc64le.Build.0 = Checked|x64
+ 		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Checked|riscv64.ActiveCfg = Checked|x64
+@@ -830,6 +895,8 @@ Global
+ 		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Debug|arm64.Build.0 = Debug|x64
+ 		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Debug|armv6.ActiveCfg = Debug|x64
+ 		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Debug|armv6.Build.0 = Debug|x64
++		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Debug|ppc64.ActiveCfg = Debug|x64
++		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Debug|ppc64.Build.0 = Debug|x64
+ 		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Debug|ppc64le.ActiveCfg = Debug|x64
+ 		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Debug|ppc64le.Build.0 = Debug|x64
+ 		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Debug|riscv64.ActiveCfg = Debug|x64
+@@ -854,6 +921,8 @@ Global
+ 		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Release|arm64.Build.0 = Release|x64
+ 		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Release|armv6.ActiveCfg = Release|x64
+ 		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Release|armv6.Build.0 = Release|x64
++		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Release|ppc64.ActiveCfg = Release|x64
++		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Release|ppc64.Build.0 = Release|x64
+ 		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Release|ppc64le.ActiveCfg = Release|x64
+ 		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Release|ppc64le.Build.0 = Release|x64
+ 		{C575D3FA-B9D8-4683-9EFB-C400AE315D35}.Release|riscv64.ActiveCfg = Release|x64
+diff --git a/src/mono/mono.proj b/src/mono/mono.proj
+index 8fe15830cab..654ab23a185 100644
+--- a/src/mono/mono.proj
++++ b/src/mono/mono.proj
+@@ -483,6 +483,12 @@ JS_ENGINES = [NODE_JS]
+       <_MonoBuildEnv Include="TARGET_BUILD_ARCH=s390x" />
+     </ItemGroup>
+ 
++    <!-- ppc64 Linux cross build options -->
++    <ItemGroup Condition="'$(MonoCrossDir)' != '' and '$(TargetArchitecture)' == 'ppc64'">
++      <_MonoCMakeArgs Include="-DCMAKE_TOOLCHAIN_FILE=$(CrossToolchainFile)" />
++      <_MonoBuildEnv Include="TARGET_BUILD_ARCH=ppc64" />
++    </ItemGroup>
++
+     <!-- ppc64le Linux cross build options -->
+     <ItemGroup Condition="'$(MonoCrossDir)' != '' and '$(TargetArchitecture)' == 'ppc64le'">
+       <_MonoCMakeArgs Include="-DCMAKE_TOOLCHAIN_FILE=$(CrossToolchainFile)" />
+diff --git a/src/native/corehost/hostmisc/pal.h b/src/native/corehost/hostmisc/pal.h
+index bde8446cc22..35552ed70f2 100644
+--- a/src/native/corehost/hostmisc/pal.h
++++ b/src/native/corehost/hostmisc/pal.h
+@@ -306,6 +306,7 @@ namespace pal
+         arm64,
+         armv6,
+         loongarch64,
++        ppc64,
+         ppc64le,
+         riscv64,
+         s390X,
+diff --git a/src/native/corehost/hostmisc/utils.cpp b/src/native/corehost/hostmisc/utils.cpp
+index 7326f3b8b8a..d982aa7bc61 100644
+--- a/src/native/corehost/hostmisc/utils.cpp
++++ b/src/native/corehost/hostmisc/utils.cpp
+@@ -197,6 +197,7 @@ namespace
+         _X("arm64"),
+         _X("armv6"),
+         _X("loongarch64"),
++        _X("ppc64"),
+         _X("ppc64le"),
+         _X("riscv64"),
+         _X("s390x"),
+@@ -225,6 +226,8 @@ pal::architecture get_current_arch()
+ #elif defined(TARGET_S390X)
+     return pal::architecture::s390X;
+ #elif defined(TARGET_POWERPC64)
++    return pal::architecture::ppc64;
++#elif defined(TARGET_POWERPC64LE)
+     return pal::architecture::ppc64le;
+ #else
+ #error "Unknown target"
+diff --git a/src/native/eventpipe/ds-portable-rid.c b/src/native/eventpipe/ds-portable-rid.c
+index ff7950729f5..85efb2b7dd9 100644
+--- a/src/native/eventpipe/ds-portable-rid.c
++++ b/src/native/eventpipe/ds-portable-rid.c
+@@ -45,6 +45,8 @@
+ #elif defined(TARGET_MIPS64)
+ #define PORTABLE_RID_ARCH "mips64"
+ #elif defined(TARGET_POWERPC64)
++#define PORTABLE_RID_ARCH "ppc64"
++#elif defined(TARGET_POWERPC64LE)
+ #define PORTABLE_RID_ARCH "ppc64le"
+ #elif defined(TARGET_RISCV64)
+ #define PORTABLE_RID_ARCH "riscv64"
+diff --git a/src/native/eventpipe/ep-event-source.c b/src/native/eventpipe/ep-event-source.c
+index 982f75a3c53..3dd57af8c09 100644
+--- a/src/native/eventpipe/ep-event-source.c
++++ b/src/native/eventpipe/ep-event-source.c
+@@ -47,6 +47,8 @@ const ep_char8_t* _ep_arch_info = "s390x";
+ #elif defined(TARGET_LOONGARCH64)
+ const ep_char8_t* _ep_arch_info = "loongarch64";
+ #elif defined(TARGET_POWERPC64)
++const ep_char8_t* _ep_arch_info = "ppc64";
++#elif defined(TARGET_POWERPC64LE)
+ const ep_char8_t* _ep_arch_info = "ppc64le";
+ #elif defined(TARGET_RISCV64)
+ const ep_char8_t* _ep_arch_info = "riscv64";
+diff --git a/src/native/external/libunwind.cmake b/src/native/external/libunwind.cmake
+index 3f5ff2b9025..59cfbafad04 100644
+--- a/src/native/external/libunwind.cmake
++++ b/src/native/external/libunwind.cmake
+@@ -373,12 +373,27 @@ set(libunwind_s390x_la_SOURCES_s390x
+     s390x/Gget_proc_info.c s390x/Gregs.c s390x/Gresume.c
+     s390x/Gis_signal_frame.c s390x/Gstep.c
+ )
++# The list of files that go both into libunwind and libunwind-ppc64:
++set(libunwind_la_SOURCES_ppc64_common
++    ${libunwind_la_SOURCES_common}
++    ppc64/is_fpreg.c ppc64/regname.c ppc64/get_func_addr.c
++)
+ # The list of files that go both into libunwind and libunwind-ppc64le:
+ set(libunwind_la_SOURCES_ppc64le_common
+     ${libunwind_la_SOURCES_common}
+     ppc64/is_fpreg.c ppc64/regname.c ppc64/get_func_addr.c
+ )
+ 
++# The list of files that go into libunwind:
++set(libunwind_la_SOURCES_ppc64
++    ${libunwind_la_SOURCES_ppc64_common}
++    ${libunwind_la_SOURCES_local}
++    ppc64/Lapply_reg_state.c ppc64/Lreg_states_iterate.c
++    ppc64/Lcreate_addr_space.c ppc/Lget_save_loc.c ppc64/Lglobal.c
++    ppc64/Linit.c ppc/Linit_local.c
++    ppc64/Lregs.c ppc64/Lresume.c
++    ppc/Lis_signal_frame.c ppc64/Lstep.c
++)
+ # The list of files that go into libunwind:
+ set(libunwind_la_SOURCES_ppc64le
+     ${libunwind_la_SOURCES_ppc64le_common}
+@@ -390,6 +405,16 @@ set(libunwind_la_SOURCES_ppc64le
+     ppc/Lis_signal_frame.c ppc64/Lstep.c
+ )
+ 
++# The list of files that go into libunwind-ppc64:
++set(libunwind_ppc64_la_SOURCES_ppc64
++    ${libunwind_la_SOURCES_ppc64_common}
++    ${libunwind_la_SOURCES_generic}
++    ppc64/Gapply_reg_state.c ppc64/Greg_states_iterate.c
++    ppc64/Gcreate_addr_space.c ppc/Gget_save_loc.c ppc64/Gglobal.c
++    ppc64/Ginit.c ppc/Ginit_local.c
++    ppc64/Gregs.c ppc64/Gresume.c
++    ppc/Gis_signal_frame.c ppc64/Gstep.c
++)
+ # The list of files that go into libunwind-ppc64le:
+ set(libunwind_ppc64le_la_SOURCES_ppc64le
+     ${libunwind_la_SOURCES_ppc64le_common}
+@@ -431,6 +456,10 @@ if(CLR_CMAKE_HOST_UNIX)
+         set(libunwind_la_SOURCES                    ${libunwind_la_SOURCES_s390x})
+         set(libunwind_remote_la_SOURCES             ${libunwind_s390x_la_SOURCES_s390x})
+         set(libunwind_elf_la_SOURCES                ${libunwind_elf64_la_SOURCES})
++    elseif(CLR_CMAKE_HOST_ARCH_POWERPC64)
++        set(libunwind_la_SOURCES                    ${libunwind_la_SOURCES_ppc64})
++        set(libunwind_remote_la_SOURCES             ${libunwind_ppc64_la_SOURCES_ppc64})
++        set(libunwind_elf_la_SOURCES                ${libunwind_elf64_la_SOURCES})
+     elseif(CLR_CMAKE_HOST_ARCH_POWERPC64LE)
+         set(libunwind_la_SOURCES                    ${libunwind_la_SOURCES_ppc64le})
+         set(libunwind_remote_la_SOURCES             ${libunwind_ppc64le_la_SOURCES_ppc64le})
+@@ -495,6 +524,10 @@ else(CLR_CMAKE_HOST_UNIX)
+         set(libunwind_la_SOURCES                    ${libunwind_la_SOURCES_s390x})
+         set(libunwind_remote_la_SOURCES             ${libunwind_s390x_la_SOURCES_s390x})
+         set(libunwind_elf_la_SOURCES                ${libunwind_elf64_la_SOURCES})
++    elseif(CLR_CMAKE_TARGET_ARCH_POWERPC64)
++        set(libunwind_la_SOURCES                    ${libunwind_la_SOURCES_ppc64})
++        set(libunwind_remote_la_SOURCES             ${libunwind_ppc64_la_SOURCES_ppc64})
++        set(libunwind_elf_la_SOURCES                ${libunwind_elf64_la_SOURCES})
+     elseif(CLR_CMAKE_TARGET_ARCH_POWERPC64LE)
+         set(libunwind_la_SOURCES                    ${libunwind_la_SOURCES_ppc64le})
+         set(libunwind_remote_la_SOURCES             ${libunwind_ppc64le_la_SOURCES_ppc64le})
+diff --git a/src/native/external/libunwind_extras/CMakeLists.txt b/src/native/external/libunwind_extras/CMakeLists.txt
+index 2bfd2194c96..60699ca9a6e 100644
+--- a/src/native/external/libunwind_extras/CMakeLists.txt
++++ b/src/native/external/libunwind_extras/CMakeLists.txt
+@@ -29,6 +29,8 @@ if(CLR_CMAKE_HOST_UNIX)
+     elseif(CLR_CMAKE_HOST_ARCH_RISCV64)
+       set(arch riscv64)
+     elseif(CLR_CMAKE_HOST_ARCH_POWERPC64)
++      set(arch ppc64)
++    elseif(CLR_CMAKE_HOST_ARCH_POWERPC64LE)
+       set(arch ppc64le)
+     endif ()
+ 
+diff --git a/src/native/libs/System.Native/pal_runtimeinformation.c b/src/native/libs/System.Native/pal_runtimeinformation.c
+index aa18e7000d1..5501d92047d 100644
+--- a/src/native/libs/System.Native/pal_runtimeinformation.c
++++ b/src/native/libs/System.Native/pal_runtimeinformation.c
+@@ -63,9 +63,10 @@ enum
+     ARCH_WASM,
+     ARCH_S390X,
+     ARCH_LOONGARCH64,
+-    ARCH_ARMV6,
+-    ARCH_POWERPC64,
++    ARCH_ARMV6,    
++    ARCH_POWERPC64LE,
+     ARCH_RISCV64,
++    ARCH_POWERPC64,
+ };
+ 
+ int32_t SystemNative_GetOSArchitecture(void)
+-- 
+2.45.2
+

@@ -1,0 +1,335 @@
+From 1384bdb78c516d23f4c3fdcf5a92d3d4dd0d6526 Mon Sep 17 00:00:00 2001
+From: Manuel Virgilio <real_virgil@yahoo.it>
+Date: Thu, 12 Dec 2024 21:37:35 +0100
+Subject: [PATCH 1/5] cmake eng refactor for ppc64 little endian and big endian
+ updates
+
+---
+ eng/Subsets.props                        |  1 +
+ eng/build.sh                             |  6 +++---
+ eng/common/cross/toolchain.cmake         |  7 +++++--
+ eng/common/native/init-os-and-arch.sh    |  4 ++++
+ eng/native/build-commons.sh              |  6 +++++-
+ eng/native/configurecompiler.cmake       | 12 +++++++++++-
+ eng/native/configureplatform.cmake       | 15 ++++++++++++---
+ eng/native/functions.cmake               |  4 ++++
+ eng/native/tryrun.cmake                  |  4 ++--
+ eng/pipelines/common/platform-matrix.yml | 21 +++++++++++++++++++++
+ eng/pipelines/runtime-community.yml      |  3 ++-
+ eng/targetingpacks.targets               |  4 ++--
+ 12 files changed, 72 insertions(+), 15 deletions(-)
+
+diff --git a/eng/Subsets.props b/eng/Subsets.props
+index d412c83ae09..ecd044bc1c4 100644
+--- a/eng/Subsets.props
++++ b/eng/Subsets.props
+@@ -28,6 +28,7 @@
+   <PropertyGroup>
+     <DefaultPrimaryRuntimeFlavor>CoreCLR</DefaultPrimaryRuntimeFlavor>
+     <DefaultPrimaryRuntimeFlavor Condition="'$(TargetArchitecture)' == 'armv6'">Mono</DefaultPrimaryRuntimeFlavor>
++    <DefaultPrimaryRuntimeFlavor Condition="'$(TargetArchitecture)' == 'ppc64'">Mono</DefaultPrimaryRuntimeFlavor>
+     <DefaultPrimaryRuntimeFlavor Condition="'$(TargetArchitecture)' == 'ppc64le'">Mono</DefaultPrimaryRuntimeFlavor>
+     <DefaultPrimaryRuntimeFlavor Condition="'$(TargetArchitecture)' == 's390x'">Mono</DefaultPrimaryRuntimeFlavor>
+     <DefaultPrimaryRuntimeFlavor Condition="'$(TargetsLinuxBionic)' == 'true'">Mono</DefaultPrimaryRuntimeFlavor>
+diff --git a/eng/build.sh b/eng/build.sh
+index df632614667..70b367117d3 100755
+--- a/eng/build.sh
++++ b/eng/build.sh
+@@ -17,7 +17,7 @@ scriptroot="$( cd -P "$( dirname "$source" )" && pwd )"
+ usage()
+ {
+   echo "Common settings:"
+-  echo "  --arch (-a)                     Target platform: x86, x64, arm, armv6, armel, arm64, loongarch64, riscv64, s390x, ppc64le or wasm."
++  echo "  --arch (-a)                     Target platform: x86, x64, arm, armv6, armel, arm64, loongarch64, riscv64, s390x, ppc64, ppc64le or wasm."
+   echo "                                  [Default: Your machine's architecture.]"
+   echo "  --binaryLog (-bl)               Output binary log."
+   echo "  --cross                         Optional argument to signify cross compilation."
+@@ -211,12 +211,12 @@ while [[ $# > 0 ]]; do
+       fi
+       passedArch="$(echo "$2" | tr "[:upper:]" "[:lower:]")"
+       case "$passedArch" in
+-        x64|x86|arm|armv6|armel|arm64|loongarch64|riscv64|s390x|ppc64le|wasm)
++        x64|x86|arm|armv6|armel|arm64|loongarch64|riscv64|s390x|ppc64|ppc64le|wasm)
+           arch=$passedArch
+           ;;
+         *)
+           echo "Unsupported target architecture '$2'."
+-          echo "The allowed values are x86, x64, arm, armv6, armel, arm64, loongarch64, riscv64, s390x, ppc64le and wasm."
++          echo "The allowed values are x86, x64, arm, armv6, armel, arm64, loongarch64, riscv64, s390x, ppc64, ppc64le and wasm."
+           exit 1
+           ;;
+       esac
+diff --git a/eng/common/cross/toolchain.cmake b/eng/common/cross/toolchain.cmake
+index 9a4e285a5ae..b63254c6ef9 100644
+--- a/eng/common/cross/toolchain.cmake
++++ b/eng/common/cross/toolchain.cmake
+@@ -74,6 +74,9 @@ elseif(TARGET_ARCH_NAME STREQUAL "ppc64le")
+   else()
+     set(TOOLCHAIN "powerpc64le-linux-gnu")
+   endif()
++elseif(TARGET_ARCH_NAME STREQUAL "ppc64")
++  set(CMAKE_SYSTEM_PROCESSOR ppc64)
++  set(TOOLCHAIN "powerpc64-linux-gnu")
+ elseif(TARGET_ARCH_NAME STREQUAL "riscv64")
+   set(CMAKE_SYSTEM_PROCESSOR riscv64)
+   if(EXISTS ${CROSS_ROOTFS}/usr/lib/gcc/riscv64-alpine-linux-musl)
+@@ -118,7 +121,7 @@ elseif(TARGET_ARCH_NAME STREQUAL "x86")
+     set(TIZEN_TOOLCHAIN "i586-tizen-linux-gnu/9.2.0")
+   endif()
+ else()
+-  message(FATAL_ERROR "Arch is ${TARGET_ARCH_NAME}. Only arm, arm64, armel, armv6, ppc64le, riscv64, s390x, x64 and x86 are supported!")
++  message(FATAL_ERROR "Arch is ${TARGET_ARCH_NAME}. Only arm, arm64, armel, armv6, ppc64, ppc64le, riscv64, s390x, x64 and x86 are supported!")
+ endif()
+ 
+ if(DEFINED ENV{TOOLCHAIN})
+@@ -312,7 +315,7 @@ endif()
+ 
+ # Specify compile options
+ 
+-if((TARGET_ARCH_NAME MATCHES "^(arm|arm64|armel|armv6|ppc64le|riscv64|s390x|x64|x86)$" AND NOT ANDROID AND NOT FREEBSD) OR ILLUMOS OR HAIKU)
++if((TARGET_ARCH_NAME MATCHES "^(arm|arm64|armel|armv6|ppc64|ppc64le|riscv64|s390x|x64|x86)$" AND NOT ANDROID AND NOT FREEBSD) OR ILLUMOS OR HAIKU)
+   set(CMAKE_C_COMPILER_TARGET ${TOOLCHAIN})
+   set(CMAKE_CXX_COMPILER_TARGET ${TOOLCHAIN})
+   set(CMAKE_ASM_COMPILER_TARGET ${TOOLCHAIN})
+diff --git a/eng/common/native/init-os-and-arch.sh b/eng/common/native/init-os-and-arch.sh
+index 38921d4338f..49f417e1886 100644
+--- a/eng/common/native/init-os-and-arch.sh
++++ b/eng/common/native/init-os-and-arch.sh
+@@ -75,6 +75,10 @@ case "$CPUName" in
+         arch=s390x
+         ;;
+ 
++    ppc64)
++        arch=ppc64
++        ;;
++
+     ppc64le)
+         arch=ppc64le
+         ;;
+diff --git a/eng/native/build-commons.sh b/eng/native/build-commons.sh
+index 2cf33442a93..164e94d0617 100755
+--- a/eng/native/build-commons.sh
++++ b/eng/native/build-commons.sh
+@@ -251,7 +251,7 @@ usage()
+     echo ""
+     echo "Common Options:"
+     echo ""
+-    echo "BuildArch can be: -arm, -armv6, -armel, -arm64, -loongarch64, -riscv64, -s390x, -ppc64le, x64, x86, -wasm"
++    echo "BuildArch can be: -arm, -armv6, -armel, -arm64, -loongarch64, -riscv64, -s390x, -ppc64, -ppc64le, x64, x86, -wasm"
+     echo "BuildType can be: -debug, -checked, -release"
+     echo "-os: target OS (defaults to running OS)"
+     echo "-bindir: output directory (defaults to $__ProjectRoot/artifacts)"
+@@ -468,6 +468,10 @@ while :; do
+             fi
+             ;;
+ 
++        ppc64|-ppc64)
++            __TargetArch=ppc64
++            ;;
++
+         ppc64le|-ppc64le)
+             __TargetArch=ppc64le
+             ;;
+diff --git a/eng/native/configurecompiler.cmake b/eng/native/configurecompiler.cmake
+index ebb4a427f28..efe8ba0ef57 100644
+--- a/eng/native/configurecompiler.cmake
++++ b/eng/native/configurecompiler.cmake
+@@ -354,6 +354,9 @@ elseif (CLR_CMAKE_HOST_ARCH_MIPS64)
+   set(ARCH_HOST_NAME mips64)
+   add_definitions(-DHOST_MIPS64 -DHOST_64BIT=1)
+ elseif (CLR_CMAKE_HOST_ARCH_POWERPC64)
++  set(ARCH_HOST_NAME ppc64)
++  add_definitions(-DHOST_POWERPC64 -DHOST_64BIT)
++elseif (CLR_CMAKE_HOST_ARCH_POWERPC64LE)
+   set(ARCH_HOST_NAME ppc64le)
+   add_definitions(-DHOST_POWERPC64 -DHOST_64BIT)
+ else ()
+@@ -379,6 +382,8 @@ if (CLR_CMAKE_HOST_UNIX)
+     elseif(CLR_CMAKE_HOST_UNIX_S390X)
+       message("Detected Linux s390x")
+     elseif(CLR_CMAKE_HOST_UNIX_POWERPC64)
++      message("Detected Linux ppc64")
++    elseif(CLR_CMAKE_HOST_UNIX_POWERPC64LE)
+       message("Detected Linux ppc64le")
+     else()
+       clr_unknown_arch()
+@@ -501,9 +506,14 @@ elseif (CLR_CMAKE_TARGET_ARCH_S390X)
+     add_compile_definitions($<$<NOT:$<BOOL:$<TARGET_PROPERTY:IGNORE_DEFAULT_TARGET_ARCH>>>:TARGET_S390X>)
+     add_compile_definitions($<$<NOT:$<BOOL:$<TARGET_PROPERTY:IGNORE_DEFAULT_TARGET_ARCH>>>:TARGET_64BIT>)
+ elseif (CLR_CMAKE_TARGET_ARCH_POWERPC64)
++    set(ARCH_TARGET_NAME ppc64)
++    set(ARCH_SOURCES_DIR ppc64)
++    add_compile_definitions($<$<NOT:$<BOOL:$<TARGET_PROPERTY:IGNORE_DEFAULT_TARGET_ARCH>>>:TARGET_POWERPC64>)
++    add_compile_definitions($<$<NOT:$<BOOL:$<TARGET_PROPERTY:IGNORE_DEFAULT_TARGET_ARCH>>>:TARGET_64BIT>)
++elseif (CLR_CMAKE_TARGET_ARCH_POWERPC64LE)
+     set(ARCH_TARGET_NAME ppc64le)
+     set(ARCH_SOURCES_DIR ppc64le)
+-    add_compile_definitions($<$<NOT:$<BOOL:$<TARGET_PROPERTY:IGNORE_DEFAULT_TARGET_ARCH>>>:TARGET_POWERPC64>)
++    add_compile_definitions($<$<NOT:$<BOOL:$<TARGET_PROPERTY:IGNORE_DEFAULT_TARGET_ARCH>>>:TARGET_POWERPC64LE>)
+     add_compile_definitions($<$<NOT:$<BOOL:$<TARGET_PROPERTY:IGNORE_DEFAULT_TARGET_ARCH>>>:TARGET_64BIT>)
+ elseif (CLR_CMAKE_TARGET_ARCH_WASM)
+     set(ARCH_TARGET_NAME wasm)
+diff --git a/eng/native/configureplatform.cmake b/eng/native/configureplatform.cmake
+index 2de5e5215db..18ec9a2fe36 100644
+--- a/eng/native/configureplatform.cmake
++++ b/eng/native/configureplatform.cmake
+@@ -60,8 +60,10 @@ if(CLR_CMAKE_HOST_OS STREQUAL linux)
+             set(CLR_CMAKE_HOST_UNIX_X86 1)
+         elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL s390x)
+             set(CLR_CMAKE_HOST_UNIX_S390X 1)
+-        elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL ppc64le)
++        elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL ppc64)
+             set(CLR_CMAKE_HOST_UNIX_POWERPC64 1)
++        elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL ppc64le)
++            set(CLR_CMAKE_HOST_UNIX_POWERPC64LE 1)
+         elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL mips64)
+             set(CLR_CMAKE_HOST_UNIX_MIPS64 1)
+         else()
+@@ -275,6 +277,9 @@ elseif(CLR_CMAKE_HOST_UNIX_S390X)
+     set(CLR_CMAKE_HOST_ARCH "s390x")
+ elseif(CLR_CMAKE_HOST_UNIX_POWERPC64)
+     set(CLR_CMAKE_HOST_ARCH_POWERPC64 1)
++    set(CLR_CMAKE_HOST_ARCH "ppc64")
++elseif(CLR_CMAKE_HOST_UNIX_POWERPC64LE)
++    set(CLR_CMAKE_HOST_ARCH_POWERPC64LE 1)
+     set(CLR_CMAKE_HOST_ARCH "ppc64le")
+ elseif(CLR_CMAKE_HOST_BROWSER)
+     set(CLR_CMAKE_HOST_ARCH_WASM 1)
+@@ -334,8 +339,10 @@ elseif(CLR_CMAKE_TARGET_ARCH STREQUAL armel)
+     set(ARM_SOFTFP 1)
+ elseif(CLR_CMAKE_TARGET_ARCH STREQUAL s390x)
+     set(CLR_CMAKE_TARGET_ARCH_S390X 1)
+-elseif(CLR_CMAKE_TARGET_ARCH STREQUAL ppc64le)
++elseif(CLR_CMAKE_TARGET_ARCH STREQUAL ppc64)
+     set(CLR_CMAKE_TARGET_ARCH_POWERPC64 1)
++elseif(CLR_CMAKE_TARGET_ARCH STREQUAL ppc64le)
++    set(CLR_CMAKE_TARGET_ARCH_POWERPC64LE 1)
+ elseif(CLR_CMAKE_TARGET_ARCH STREQUAL wasm)
+     set(CLR_CMAKE_TARGET_ARCH_WASM 1)
+ elseif(CLR_CMAKE_TARGET_ARCH STREQUAL mips64)
+@@ -455,8 +462,10 @@ if(CLR_CMAKE_TARGET_UNIX)
+         set(CLR_CMAKE_TARGET_UNIX_X86 1)
+     elseif(CLR_CMAKE_TARGET_ARCH STREQUAL s390x)
+         set(CLR_CMAKE_TARGET_UNIX_S390X 1)
+-    elseif(CLR_CMAKE_TARGET_ARCH STREQUAL ppc64le)
++    elseif(CLR_CMAKE_TARGET_ARCH STREQUAL ppc64)
+         set(CLR_CMAKE_TARGET_UNIX_POWERPC64 1)
++    elseif(CLR_CMAKE_TARGET_ARCH STREQUAL ppc64le)
++        set(CLR_CMAKE_TARGET_UNIX_POWERPC64LE 1)
+     elseif(CLR_CMAKE_TARGET_ARCH STREQUAL wasm)
+         set(CLR_CMAKE_TARGET_UNIX_WASM 1)
+     elseif(CLR_CMAKE_TARGET_ARCH STREQUAL mips64)
+diff --git a/eng/native/functions.cmake b/eng/native/functions.cmake
+index b1cb09d6620..ea0b08618e9 100644
+--- a/eng/native/functions.cmake
++++ b/eng/native/functions.cmake
+@@ -182,6 +182,10 @@ function(find_unwind_libs UnwindLibs)
+     endif()
+ 
+     if(CLR_CMAKE_HOST_ARCH_POWERPC64)
++      find_library(UNWIND_ARCH NAMES unwind-ppc64)
++    endif()
++
++    if(CLR_CMAKE_HOST_ARCH_POWERPC64LE)
+       find_library(UNWIND_ARCH NAMES unwind-ppc64le)
+     endif()
+ 
+diff --git a/eng/native/tryrun.cmake b/eng/native/tryrun.cmake
+index c0fe823dd78..1d9272ae3cb 100644
+--- a/eng/native/tryrun.cmake
++++ b/eng/native/tryrun.cmake
+@@ -74,7 +74,7 @@ if(DARWIN)
+   else()
+     message(FATAL_ERROR "Arch is ${TARGET_ARCH_NAME}. Only arm64 or x64 is supported for OSX cross build!")
+   endif()
+-elseif(TARGET_ARCH_NAME MATCHES "^(armel|arm|armv6|arm64|loongarch64|riscv64|s390x|ppc64le|x86|x64)$" OR FREEBSD OR ILLUMOS OR TIZEN OR HAIKU)
++elseif(TARGET_ARCH_NAME MATCHES "^(armel|arm|armv6|arm64|loongarch64|riscv64|s390x|ppc64|ppc64le|x86|x64)$" OR FREEBSD OR ILLUMOS OR TIZEN OR HAIKU)
+   set_cache_value(HAS_POSIX_SEMAPHORES_EXITCODE 0)
+   set_cache_value(HAVE_CLOCK_MONOTONIC_COARSE_EXITCODE 0)
+   set_cache_value(HAVE_CLOCK_MONOTONIC_EXITCODE 0)
+@@ -123,6 +123,6 @@ else()
+   message(FATAL_ERROR "Unsupported platform. OS: ${CMAKE_SYSTEM_NAME}, arch: ${TARGET_ARCH_NAME}")
+ endif()
+ 
+-if(TARGET_ARCH_NAME MATCHES "^(x86|x64|s390x|armv6|loongarch64|riscv64|ppc64le)$")
++if(TARGET_ARCH_NAME MATCHES "^(x86|x64|s390x|armv6|loongarch64|riscv64|ppc64|ppc64le)$")
+   set_cache_value(HAVE_FUNCTIONAL_PTHREAD_ROBUST_MUTEXES_EXITCODE 0)
+ endif()
+diff --git a/eng/pipelines/common/platform-matrix.yml b/eng/pipelines/common/platform-matrix.yml
+index 23370eabe21..a3cd472d707 100644
+--- a/eng/pipelines/common/platform-matrix.yml
++++ b/eng/pipelines/common/platform-matrix.yml
+@@ -396,6 +396,27 @@ jobs:
+         crossBuild: true
+         ${{ insert }}: ${{ parameters.jobParameters }}
+ 
++# Linux PPC64
++
++- ${{ if containsValue(parameters.platforms, 'linux_ppc64') }}:
++  - template: xplat-setup.yml
++    parameters:
++      jobTemplate: ${{ parameters.jobTemplate }}
++      helixQueuesTemplate: ${{ parameters.helixQueuesTemplate }}
++      variables: ${{ parameters.variables }}
++      osGroup: linux
++      archType: ppc64
++      targetRid: linux-ppc64
++      platform: linux_ppc64
++      shouldContinueOnError: ${{ parameters.shouldContinueOnError }}
++      container: linux_ppc64
++      jobParameters:
++        runtimeFlavor: ${{ parameters.runtimeFlavor }}
++        buildConfig: ${{ parameters.buildConfig }}
++        helixQueueGroup: ${{ parameters.helixQueueGroup }}
++        crossBuild: true
++        ${{ insert }}: ${{ parameters.jobParameters }}
++
+ # Linux PPC64le
+ 
+ - ${{ if containsValue(parameters.platforms, 'linux_ppc64le') }}:
+diff --git a/eng/pipelines/runtime-community.yml b/eng/pipelines/runtime-community.yml
+index b7a21f58897..6f5b4d829ed 100644
+--- a/eng/pipelines/runtime-community.yml
++++ b/eng/pipelines/runtime-community.yml
+@@ -43,7 +43,7 @@ extends:
+       jobs:
+ 
+       #
+-      # s390x & PPC64 little endian
++      # s390x & PPC64 little/big endian
+       # Build the whole product using Mono and run libraries tests
+       #
+       - template: /eng/pipelines/common/platform-matrix.yml
+@@ -54,6 +54,7 @@ extends:
+           runtimeFlavor: mono
+           platforms:
+           - linux_s390x
++          - linux_ppc64
+           - linux_ppc64le
+           variables:
+             # map dependencies variables to local variables
+diff --git a/eng/targetingpacks.targets b/eng/targetingpacks.targets
+index 837ec7601fd..683a87ae671 100644
+--- a/eng/targetingpacks.targets
++++ b/eng/targetingpacks.targets
+@@ -43,7 +43,7 @@
+                              LatestRuntimeFrameworkVersion="$(ProductVersion)"
+                              RuntimeFrameworkName="$(LocalFrameworkOverrideName)"
+                              RuntimePackNamePatterns="$(LocalFrameworkOverrideName).Runtime.**RID**"
+-                             RuntimePackRuntimeIdentifiers="linux-arm;linux-arm64;linux-musl-arm64;linux-musl-x64;linux-x64;osx-x64;rhel.6-x64;tizen.4.0.0-armel;tizen.5.0.0-armel;win-arm64;win-x64;win-x86;linux-musl-arm;osx-arm64;maccatalyst-x64;maccatalyst-arm64;linux-s390x;linux-bionic-arm;linux-bionic-arm64;linux-bionic-x64;linux-bionic-x86;freebsd-x64;freebsd-arm64;linux-ppc64le;linux-riscv64;linux-musl-riscv64;linux-loongarch64;linux-musl-loongarch64"
++                             RuntimePackRuntimeIdentifiers="linux-arm;linux-arm64;linux-musl-arm64;linux-musl-x64;linux-x64;osx-x64;rhel.6-x64;tizen.4.0.0-armel;tizen.5.0.0-armel;win-arm64;win-x64;win-x86;linux-musl-arm;osx-arm64;maccatalyst-x64;maccatalyst-arm64;linux-s390x;linux-bionic-arm;linux-bionic-arm64;linux-bionic-x64;linux-bionic-x86;freebsd-x64;freebsd-arm64;linux-ppc64;linux-ppc64le;linux-riscv64;linux-musl-riscv64;linux-loongarch64;linux-musl-loongarch64"
+                              TargetFramework="$(NetCoreAppCurrent)"
+                              TargetingPackName="$(LocalFrameworkOverrideName).Ref"
+                              TargetingPackVersion="$(ProductVersion)"
+@@ -84,7 +84,7 @@
+                       ExcludedRuntimeIdentifiers="android"
+                       AppHostPackNamePattern="$(LocalFrameworkOverrideName).Host.**RID**"
+                       AppHostPackVersion="$(ProductVersion)"
+-                      AppHostRuntimeIdentifiers="linux-arm;linux-arm64;linux-musl-arm64;linux-musl-x64;linux-x64;osx-x64;rhel.6-x64;tizen.4.0.0-armel;tizen.5.0.0-armel;win-arm64;win-x64;win-x86;linux-musl-arm;osx-arm64;linux-s390x;linux-bionic-arm;linux-bionic-arm64;linux-bionic-x64;linux-bionic-x86;linux-ppc64le;linux-riscv64;linux-musl-riscv64;linux-loongarch64;linux-musl-loongarch64"
++                      AppHostRuntimeIdentifiers="linux-arm;linux-arm64;linux-musl-arm64;linux-musl-x64;linux-x64;osx-x64;rhel.6-x64;tizen.4.0.0-armel;tizen.5.0.0-armel;win-arm64;win-x64;win-x86;linux-musl-arm;osx-arm64;linux-s390x;linux-bionic-arm;linux-bionic-arm64;linux-bionic-x64;linux-bionic-x86;linux-ppc64;linux-ppc64le;linux-riscv64;linux-musl-riscv64;linux-loongarch64;linux-musl-loongarch64"
+                       TargetFramework="$(NetCoreAppCurrent)"
+                       Condition="'$(UseLocalAppHostPack)' == 'true' and '@(KnownAppHostPack->AnyHaveMetadataValue('TargetFramework', '$(NetCoreAppCurrent)'))' != 'true'" />
+   </ItemGroup>
+-- 
+2.45.2
+

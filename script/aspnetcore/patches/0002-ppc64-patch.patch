@@ -1,0 +1,55 @@
+From a12f6331b6fcd13e39d214357f9aca530bff31a3 Mon Sep 17 00:00:00 2001
+From: Manuel Virgilio <real_virgil@yahoo.it>
+Date: Thu, 19 Dec 2024 15:34:51 +0100
+Subject: [PATCH 2/2] ppc64 patch
+
+---
+ .../App.Runtime/src/Microsoft.AspNetCore.App.Runtime.csproj  | 4 ++--
+ .../src/Common/RuntimeArchitecture.cs                        | 5 +++--
+ .../src/Common/RuntimeArchitectures.cs                       | 1 +
+ 3 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/src/Framework/App.Runtime/src/Microsoft.AspNetCore.App.Runtime.csproj b/src/Framework/App.Runtime/src/Microsoft.AspNetCore.App.Runtime.csproj
+index 48725d7213..4ee8feb5c0 100644
+--- a/src/Framework/App.Runtime/src/Microsoft.AspNetCore.App.Runtime.csproj
++++ b/src/Framework/App.Runtime/src/Microsoft.AspNetCore.App.Runtime.csproj
+@@ -41,8 +41,8 @@ This package is an internal implementation of the .NET Core SDK and is not meant
+     <!-- Pack .ni.r2rmap files in symbols package (native symbols for Linux) -->
+     <AllowedOutputExtensionsInSymbolsPackageBuildOutputFolder>$(AllowedOutputExtensionsInSymbolsPackageBuildOutputFolder);.r2rmap</AllowedOutputExtensionsInSymbolsPackageBuildOutputFolder>
+ 
+-    <!-- Optimize the framework using the crossgen2 tool. Crossgen2 is not currently supported on s390x or ppc64le or armv6 or loongarch64. -->
+-    <CrossgenOutput Condition=" '$(TargetArchitecture)' == 's390x' OR '$(TargetArchitecture)' == 'armv6' OR '$(TargetArchitecture)' == 'ppc64le' OR '$(TargetArchitecture)' == 'loongarch64' ">false</CrossgenOutput>
++    <!-- Optimize the framework using the crossgen2 tool. Crossgen2 is not currently supported on s390x or ppc64 or ppc64le or armv6 or loongarch64. -->
++    <CrossgenOutput Condition=" '$(TargetArchitecture)' == 's390x' OR '$(TargetArchitecture)' == 'armv6' OR '$(TargetArchitecture)' == 'ppc64' OR '$(TargetArchitecture)' == 'ppc64le' OR '$(TargetArchitecture)' == 'loongarch64' ">false</CrossgenOutput>
+     <!-- VMR doesn't produce valid crossgen for the host/build machine https://github.com/dotnet/source-build/issues/3793 -->
+     <CrossgenOutput Condition=" '$(DotNetBuild)' == 'true' AND '$(Crossbuild)' == 'true' ">false</CrossgenOutput>
+     <CrossgenOutput Condition=" '$(CrossgenOutput)' == '' AND '$(Configuration)' != 'Debug' ">true</CrossgenOutput>
+diff --git a/src/Hosting/Server.IntegrationTesting/src/Common/RuntimeArchitecture.cs b/src/Hosting/Server.IntegrationTesting/src/Common/RuntimeArchitecture.cs
+index 02d1964fdc..0e97063c98 100644
+--- a/src/Hosting/Server.IntegrationTesting/src/Common/RuntimeArchitecture.cs
++++ b/src/Hosting/Server.IntegrationTesting/src/Common/RuntimeArchitecture.cs
+@@ -8,6 +8,7 @@ public enum RuntimeArchitecture
+     arm64,
+     x64,
+     x86,
+-    ppc64le, //Power Architecture
+-    s390x
++    ppc64le, //Power Architecture Little Endian
++    s390x,
++    ppc64, //Power Architecture Big Endian
+ }
+diff --git a/src/Hosting/Server.IntegrationTesting/src/Common/RuntimeArchitectures.cs b/src/Hosting/Server.IntegrationTesting/src/Common/RuntimeArchitectures.cs
+index 94d4cef55a..b05c8f2ce1 100644
+--- a/src/Hosting/Server.IntegrationTesting/src/Common/RuntimeArchitectures.cs
++++ b/src/Hosting/Server.IntegrationTesting/src/Common/RuntimeArchitectures.cs
+@@ -18,6 +18,7 @@ public class RuntimeArchitectures
+                 Architecture.X86 => RuntimeArchitecture.x86,
+                 Architecture.Ppc64le => RuntimeArchitecture.ppc64le,
+                 Architecture.S390x => RuntimeArchitecture.s390x,
++                Architecture.Ppc64 => RuntimeArchitecture.ppc64,
+                 _ => throw new NotImplementedException($"Unknown RuntimeInformation.OSArchitecture: {RuntimeInformation.OSArchitecture.ToString()}"),
+             };
+         }
+-- 
+2.45.2
+

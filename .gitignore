@@ -1,0 +1,4 @@
+nuget-packages/*
+github_repo/*
+redist/*
+x86-*/*

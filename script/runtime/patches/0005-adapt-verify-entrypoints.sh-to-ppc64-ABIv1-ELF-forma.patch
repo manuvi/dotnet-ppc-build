@@ -1,0 +1,132 @@
+From 8e772ab898513ff6998583253852496dda871fd6 Mon Sep 17 00:00:00 2001
+From: Manuel Virgilio <real_virgil@yahoo.it>
+Date: Thu, 19 Dec 2024 00:10:36 +0100
+Subject: [PATCH 5/5] adapt verify-entrypoints.sh to ppc64 ABIv1 ELF format
+ update pal runtime information
+
+---
+ .../libs/System.IO.Compression.Native/CMakeLists.txt |  1 +
+ src/native/libs/System.Native/CMakeLists.txt         |  1 +
+ .../libs/System.Native/pal_runtimeinformation.c      |  7 ++++++-
+ .../libs/System.Net.Security.Native/CMakeLists.txt   |  1 +
+ .../CMakeLists.txt                                   |  1 +
+ .../CMakeLists.txt                                   |  1 +
+ src/native/libs/verify-entrypoints.sh                | 12 +++++++++---
+ 7 files changed, 20 insertions(+), 4 deletions(-)
+
+diff --git a/src/native/libs/System.IO.Compression.Native/CMakeLists.txt b/src/native/libs/System.IO.Compression.Native/CMakeLists.txt
+index c8239e4ee04..c3c595e5098 100644
+--- a/src/native/libs/System.IO.Compression.Native/CMakeLists.txt
++++ b/src/native/libs/System.IO.Compression.Native/CMakeLists.txt
+@@ -78,6 +78,7 @@ if (CLR_CMAKE_TARGET_UNIX OR CLR_CMAKE_TARGET_BROWSER OR CLR_CMAKE_TARGET_WASI)
+                     $<TARGET_FILE:System.IO.Compression.Native>
+                     ${CMAKE_CURRENT_SOURCE_DIR}/entrypoints.c
+                     ${CMAKE_NM}
++                    ${TARGET_ARCH_NAME}
+                 VERBATIM
+             )
+         endif ()
+diff --git a/src/native/libs/System.Native/CMakeLists.txt b/src/native/libs/System.Native/CMakeLists.txt
+index 4cac1051f67..ef3532f38ec 100644
+--- a/src/native/libs/System.Native/CMakeLists.txt
++++ b/src/native/libs/System.Native/CMakeLists.txt
+@@ -137,6 +137,7 @@ if (GEN_SHARED_LIB)
+                 $<TARGET_FILE:System.Native>
+                 ${CMAKE_CURRENT_SOURCE_DIR}/entrypoints.c
+                 ${CMAKE_NM}
++                ${TARGET_ARCH_NAME}
+             VERBATIM
+         )
+     endif()
+diff --git a/src/native/libs/System.Native/pal_runtimeinformation.c b/src/native/libs/System.Native/pal_runtimeinformation.c
+index 5501d92047d..7136356d1d7 100644
+--- a/src/native/libs/System.Native/pal_runtimeinformation.c
++++ b/src/native/libs/System.Native/pal_runtimeinformation.c
+@@ -130,11 +130,16 @@ int32_t SystemNative_GetOSArchitecture(void)
+             result = ARCH_S390X;
+         }
+ 
+-        else if (strcmp("ppc64le", isa) == 0)
++        else if (strcmp("ppc64", isa) == 0)
+         {
+             result = ARCH_POWERPC64;
+         }
+ 
++        else if (strcmp("ppc64le", isa) == 0)
++        {
++            result = ARCH_POWERPC64LE;
++        }
++
+         else if (strcmp("loongarch64", isa) == 0)
+         {
+             result = ARCH_LOONGARCH64;
+diff --git a/src/native/libs/System.Net.Security.Native/CMakeLists.txt b/src/native/libs/System.Net.Security.Native/CMakeLists.txt
+index b0e02f41509..9ea9efb98f1 100644
+--- a/src/native/libs/System.Net.Security.Native/CMakeLists.txt
++++ b/src/native/libs/System.Net.Security.Native/CMakeLists.txt
+@@ -43,6 +43,7 @@ if (GEN_SHARED_LIB)
+                 $<TARGET_FILE:System.Net.Security.Native>
+                 ${CMAKE_CURRENT_SOURCE_DIR}/entrypoints.c
+                 ${CMAKE_NM}
++                ${TARGET_ARCH_NAME}
+             VERBATIM
+         )
+     endif()
+diff --git a/src/native/libs/System.Security.Cryptography.Native.Apple/CMakeLists.txt b/src/native/libs/System.Security.Cryptography.Native.Apple/CMakeLists.txt
+index 84615493f44..133c03cc404 100644
+--- a/src/native/libs/System.Security.Cryptography.Native.Apple/CMakeLists.txt
++++ b/src/native/libs/System.Security.Cryptography.Native.Apple/CMakeLists.txt
+@@ -129,6 +129,7 @@ if (GEN_SHARED_LIB)
+                 $<TARGET_FILE:System.Security.Cryptography.Native.Apple>
+                 ${CMAKE_CURRENT_SOURCE_DIR}/entrypoints.c
+                 ${CMAKE_NM}
++                ${TARGET_ARCH_NAME}
+             VERBATIM
+         )
+     endif()
+diff --git a/src/native/libs/System.Security.Cryptography.Native/CMakeLists.txt b/src/native/libs/System.Security.Cryptography.Native/CMakeLists.txt
+index ca536c1697a..a59e3cf405c 100644
+--- a/src/native/libs/System.Security.Cryptography.Native/CMakeLists.txt
++++ b/src/native/libs/System.Security.Cryptography.Native/CMakeLists.txt
+@@ -127,6 +127,7 @@ if (GEN_SHARED_LIB)
+                 $<TARGET_FILE:System.Security.Cryptography.Native.OpenSsl>
+                 ${CMAKE_CURRENT_SOURCE_DIR}/entrypoints.c
+                 ${CMAKE_NM}
++                ${TARGET_ARCH_NAME}
+             VERBATIM
+         )
+     endif()
+diff --git a/src/native/libs/verify-entrypoints.sh b/src/native/libs/verify-entrypoints.sh
+index 9e89a5abb5d..6afa1b76778 100755
+--- a/src/native/libs/verify-entrypoints.sh
++++ b/src/native/libs/verify-entrypoints.sh
+@@ -1,8 +1,8 @@
+ #!/usr/bin/env bash
+ 
+-if (( $# != 3 )); then
++if (( $# < 3 )); then
+   echo "Usage:"
+-  echo "verify-entrypoints.sh <path to shared library> <path to entries.c file> <path to NM command>"
++  echo "verify-entrypoints.sh <path to shared library> <path to entries.c file> <path to NM command> <target architecture>"
+   exit 1
+ fi
+ 
+@@ -10,8 +10,14 @@ nmCommand=$3
+ 
+ IFS=$'\n'
+ dllList=()
+-for line in $($nmCommand $1); do
++if (( $# == 4)) && [ "$4" = "ppc64" ]; then
++  # due to ABIv1 format
++  pattern='^[[:xdigit:]]+ D _?([[:alnum:]_]+)'
++else
+   pattern='^[[:xdigit:]]+ T _?([[:alnum:]_]+)'
++fi
++
++for line in $($nmCommand $1); do
+   if [[ $line =~ $pattern ]]; then
+     # skip symbols that we don't want to consider
+     case ${BASH_REMATCH[1]} in
+-- 
+2.45.2
+
